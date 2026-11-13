@@ -709,8 +709,6 @@ function InstallDialog({
           </div>
         )}
 
-        <span className="skp-note">安装到：项目 .agents/skills</span>
-
         <label className="skp-field skp-field-inline">
           <input type="checkbox" checked={overwrite} onChange={(e) => setOverwrite(e.target.checked)} />
           同名技能已存在时覆盖
