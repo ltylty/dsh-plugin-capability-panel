@@ -12,9 +12,12 @@
  * @module @chengdb/capability-panel/skills/manager
  */
 import type { TransferFile } from "./transfer.js";
+import type { SkillLibraryView } from "./library.js";
 import type { SkillFormat, SkillSummaryView } from "./types.js";
 /** 构建 `ctx.capabilityPanel.skills` 服务。 */
-export declare function createService(): {
+export declare function createService(config?: {
+    skillLibrary?: string;
+}): {
     list: (cwd?: string) => Promise<SkillSummaryView[]>;
     /** 创建 skill；目标根固定 `<项目根>/.agents/skills`。 */
     create(input: {
@@ -63,13 +66,15 @@ export declare function createService(): {
         cwd?: string;
         name: string;
     }): Promise<import("./crud.js").ReadResult>;
+    /** 技能库目录下的可安装条目（供安装对话框下拉框使用）。 */
+    sources(): Promise<SkillLibraryView>;
     /**
-     * 安装 skill：`sourcePath` 走宿主路径复制，`url` 走 HTTP 下载
+     * 安装 skill：`entry` 从预置技能库选择，`url` 走 HTTP 下载
      * （GitHub 仓库 / .zip / raw .md），`files` 走客户端上传落盘。
      */
     install(input: {
         cwd?: string;
-        sourcePath?: string;
+        entry?: string;
         url?: string;
         files?: TransferFile[];
         overwrite?: boolean;

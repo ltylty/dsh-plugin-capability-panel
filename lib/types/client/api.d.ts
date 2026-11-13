@@ -61,10 +61,25 @@ export interface InstallUploadInput {
     files: SkillFilePayload[];
     overwrite?: boolean;
 }
-/** 宿主路径安装的入参。 */
-export interface InstallPathInput {
-    sourcePath: string;
+/** 从预置技能库安装的入参。 */
+export interface InstallLibraryInput {
+    /** 技能库目录内的条目名（下拉框选中值）。 */
+    entry: string;
     overwrite?: boolean;
+}
+/** 技能库里的一个可安装条目。 */
+export interface LibrarySkill {
+    name: string;
+    description: string;
+    entry: string;
+    format: SkillFormat;
+}
+/** 技能库列表视图。 */
+export interface SkillLibraryView {
+    /** 技能库目录绝对路径；未配置时缺省。 */
+    dir?: string;
+    skills: LibrarySkill[];
+    errors: string[];
 }
 /** URL 下载安装的入参（GitHub 仓库 / .zip / raw .md）。 */
 export interface InstallUrlInput {
@@ -115,8 +130,10 @@ export interface SkillsApi {
     }): Promise<OpResult>;
     /** 浏览器上传安装。 */
     installUpload(input: InstallUploadInput): Promise<InstallResult>;
-    /** 从宿主磁盘路径安装。 */
-    installFromPath(input: InstallPathInput): Promise<InstallResult>;
+    /** 列出预置技能库中的可安装条目。 */
+    sources(): Promise<SkillLibraryView>;
+    /** 从预置技能库安装。 */
+    installFromLibrary(input: InstallLibraryInput): Promise<InstallResult>;
     /** 从 URL 下载安装。 */
     installFromUrl(input: InstallUrlInput): Promise<InstallResult>;
     /** 导出为 base64 文件清单（供浏览器下载/打包）。 */

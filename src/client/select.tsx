@@ -27,6 +27,7 @@ interface PopAnchor {
   left: number;
   top: number;
   width: number;
+  maxWidth: number;
   maxHeight: number;
 }
 
@@ -94,10 +95,14 @@ export function SkpSelect({
     }
     const rect = btnRef.current?.getBoundingClientRect();
     if (rect === undefined) return;
+    const width = Math.max(rect.width, 200);
+    // 弹层固定定位在按钮下方；左右夹在视口内，宽度不超过右侧剩余空间。
+    const left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12));
     setAnchor({
-      left: rect.left,
+      left,
       top: rect.bottom + 6,
-      width: Math.max(rect.width, 200),
+      width,
+      maxWidth: Math.max(200, window.innerWidth - left - 12),
       maxHeight: Math.max(160, window.innerHeight - rect.bottom - 18),
     });
   };
@@ -121,7 +126,7 @@ export function SkpSelect({
         <div
           className="skp-dd-pop"
           role="listbox"
-          style={{ left: anchor.left, top: anchor.top, minWidth: anchor.width, maxHeight: anchor.maxHeight }}
+          style={{ left: anchor.left, top: anchor.top, minWidth: anchor.width, maxWidth: anchor.maxWidth, maxHeight: anchor.maxHeight }}
         >
           {options.map((option) => {
             const active = option.value === value;
@@ -139,7 +144,11 @@ export function SkpSelect({
                 }}
               >
                 <span className="skp-dd-opt-label">{option.label}</span>
-                {option.hint !== undefined && <span className="skp-dd-hint">{option.hint}</span>}
+                {option.hint !== undefined && (
+                  <span className="skp-dd-hint" title={option.hint}>
+                    {option.hint}
+                  </span>
+                )}
                 {active && (
                   <span className="skp-dd-check" aria-hidden="true">
                     ✓

@@ -19,6 +19,7 @@ import type {
   CreateSkillInput,
   InstallResult,
   McpUpsertInput,
+  SkillLibraryView,
   WorkspaceOption,
 } from "./api.js";
 
@@ -123,7 +124,13 @@ export function createPanelApi(deps: AdapterDeps): CapabilityPanelApi {
         return toInstallResult(unwrap(await rpc("skills.install", { ...input, cwd })));
       },
 
-      async installFromPath(input) {
+      async sources(): Promise<SkillLibraryView> {
+        const result = await rpc("skills.sources", {});
+        if (!result.ok) throw new Error(result.errors.join("; "));
+        return result.value as SkillLibraryView;
+      },
+
+      async installFromLibrary(input) {
         const cwd = deps.currentWorkspaceCwd();
         return toInstallResult(unwrap(await rpc("skills.install", { ...input, cwd })));
       },

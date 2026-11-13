@@ -25,6 +25,9 @@
 
 ### 变更
 
+- 安装技能的「宿主路径」改为「技能库」：新增 `skillLibrary` 配置
+  （回退环境变量 `DSH_SKILL_LIBRARY`），面板从预置目录下拉选择，
+  不再接受任意宿主路径。
 - 版本升至 2.0.0；移除 `@deepseek-ai/dsh-home-paths` 依赖。
 - 新增 devDependency `unrun`（`tsdown` 加载 TS 配置所需）。
 

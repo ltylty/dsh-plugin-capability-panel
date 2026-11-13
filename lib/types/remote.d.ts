@@ -39,6 +39,7 @@ export interface PanelRpcService {
         remove(input: unknown): Promise<unknown>;
         setEnabled(input: unknown): Promise<unknown>;
         setInvocation(input: unknown): Promise<unknown>;
+        sources(): Promise<unknown>;
         install(input: unknown): Promise<unknown>;
         export(input: unknown): Promise<unknown>;
     };

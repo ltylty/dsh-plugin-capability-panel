@@ -26,6 +26,8 @@ import {
 import { installFromUrl } from "./download.js";
 import { exportSkillFiles, exportToPath, installFromFiles, installFromPath } from "./transfer.js";
 import type { TransferFile } from "./transfer.js";
+import { listSkillLibrary, resolveLibraryDir, resolveLibraryEntry } from "./library.js";
+import type { SkillLibraryView } from "./library.js";
 import { invocationPolicy } from "./types.js";
 import type { InvocationPolicy, SkillFormat, SkillSource, SkillSummaryView } from "./types.js";
 
@@ -39,7 +41,10 @@ function rootFor(cwd: string | undefined): string {
 }
 
 /** 构建 `ctx.capabilityPanel.skills` 服务。 */
-export function createService() {
+export function createService(config: { skillLibrary?: string } = {}) {
+  /** 供「从技能库安装」使用的预置目录；未配置时为 undefined。 */
+  const libraryDir = resolveLibraryDir(config.skillLibrary);
+
   /** 项目级 skill 的只读磁盘视图（按名称排序）。 */
   async function list(cwd?: string): Promise<SkillSummaryView[]> {
     if (cwd === undefined) return [];
@@ -100,20 +105,31 @@ export function createService() {
     async read(input: { cwd?: string; name: string }) {
       return readSkillDetail(rootFor(input.cwd), input.name);
     },
+    /** 技能库目录下的可安装条目（供安装对话框下拉框使用）。 */
+    async sources(): Promise<SkillLibraryView> {
+      return listSkillLibrary(libraryDir);
+    },
     /**
-     * 安装 skill：`sourcePath` 走宿主路径复制，`url` 走 HTTP 下载
+     * 安装 skill：`entry` 从预置技能库选择，`url` 走 HTTP 下载
      * （GitHub 仓库 / .zip / raw .md），`files` 走客户端上传落盘。
      */
     async install(input: {
       cwd?: string;
-      sourcePath?: string;
+      entry?: string;
       url?: string;
       files?: TransferFile[];
       overwrite?: boolean;
     }) {
       const root = rootFor(input.cwd);
-      if (typeof input.sourcePath === "string" && input.sourcePath.length > 0) {
-        return installFromPath({ root, sourcePath: input.sourcePath, overwrite: input.overwrite });
+      if (typeof input.entry === "string" && input.entry.length > 0) {
+        if (libraryDir === undefined) {
+          return { ok: false, errors: ["skill library is not configured (set skillLibrary or DSH_SKILL_LIBRARY)"] };
+        }
+        const sourcePath = resolveLibraryEntry(libraryDir, input.entry);
+        if (sourcePath === undefined) {
+          return { ok: false, errors: [`invalid skill library entry "${input.entry}"`] };
+        }
+        return installFromPath({ root, sourcePath, overwrite: input.overwrite });
       }
       if (typeof input.url === "string" && input.url.length > 0) {
         return installFromUrl({ root, url: input.url, overwrite: input.overwrite });
@@ -121,7 +137,7 @@ export function createService() {
       if (Array.isArray(input.files)) {
         return installFromFiles({ root, files: input.files, overwrite: input.overwrite });
       }
-      return { ok: false, errors: ["install requires a sourcePath, a url, or a files list"] };
+      return { ok: false, errors: ["install requires an entry, a url, or a files list"] };
     },
     /** 导出 skill：给 `destDir` 复制到宿主目录；否则读成 base64 文件清单。 */
     async export(input: { cwd?: string; name: string; destDir?: string; overwrite?: boolean }) {

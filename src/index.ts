@@ -36,6 +36,11 @@ export interface Config {
   mountRpc?: boolean;
   /** 为 false 时不自动把 MCP server 挂载进 agent。缺省 true。 */
   mountMcp?: boolean;
+  /**
+   * 预置技能库目录：面板「安装技能 → 技能库」从该目录列出可选 skill。
+   * 未配置时回退环境变量 `DSH_SKILL_LIBRARY`。
+   */
+  skillLibrary?: string;
 }
 
 /** 暴露给宿主调用方的传输无关服务：skills + mcp 两个域。 */
@@ -60,7 +65,7 @@ declare module "@deepseek-ai/cordis" {
 export function apply(ctx: any, config: Config = {}) {
   const loader = createMcpLoader(ctx, { enabled: config.mountMcp !== false });
   const service: CapabilityPanelService = {
-    skills: createService(),
+    skills: createService({ skillLibrary: config.skillLibrary }),
     mcp: createMcpManager(loader),
   };
   ctx.provide("capabilityPanel", () => service);
@@ -91,6 +96,8 @@ export { installFromPath, installFromFiles, exportToPath, exportSkillFiles } fro
 export { installFromUrl, fetchSkillFiles, classifySkillUrl } from "./skills/download.js";
 export { unzipSync } from "./skills/unzip.js";
 export { locateSkillRoot } from "./shared/skill-locate.js";
+export { listSkillLibrary, resolveLibraryDir, resolveLibraryEntry } from "./skills/library.js";
+export type { LibrarySkill, SkillLibraryView } from "./skills/library.js";
 export type { TransferFile, TransferResult } from "./skills/transfer.js";
 export { isSkillName, validateSpec } from "./skills/validate.js";
 export { invocationPolicy } from "./skills/types.js";

@@ -46,6 +46,7 @@ export interface PanelRpcService {
     remove(input: unknown): Promise<unknown>;
     setEnabled(input: unknown): Promise<unknown>;
     setInvocation(input: unknown): Promise<unknown>;
+    sources(): Promise<unknown>;
     install(input: unknown): Promise<unknown>;
     export(input: unknown): Promise<unknown>;
   };
@@ -86,6 +87,8 @@ export async function handleEndpoint(
         return { ok: true, value: await service.skills.setEnabled(p) };
       case "skills.setInvocation":
         return { ok: true, value: await service.skills.setInvocation(p) };
+      case "skills.sources":
+        return { ok: true, value: await service.skills.sources() };
       case "skills.install":
         return { ok: true, value: await service.skills.install(p) };
       case "skills.export":

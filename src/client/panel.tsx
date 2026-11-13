@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CapabilityPanelApi, ClientSkillSummary, SkillFilePayload, SkillRef, SkillsApi } from "./api.js";
+import type { CapabilityPanelApi, ClientSkillSummary, SkillFilePayload, SkillLibraryView, SkillRef, SkillsApi } from "./api.js";
 import { McpView } from "./mcp-panel.js";
 import { Modal } from "./modal.js";
 import { SkpSelect } from "./select.js";
@@ -483,7 +483,7 @@ function skillRef(summary: ClientSkillSummary): SkillRef {
 // ---------------------------------------------------------------------------
 
 /** 安装对话框的来源模式与 Tab 文案。 */
-const INSTALL_MODE = { upload: "上传", path: "宿主路径", url: "URL" } as const;
+const INSTALL_MODE = { upload: "上传", library: "技能库", url: "URL" } as const;
 type InstallMode = keyof typeof INSTALL_MODE;
 
 /**
@@ -505,12 +505,34 @@ function InstallDialog({
   const [overwrite, setOverwrite] = useState(false);
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
-  const [sourcePath, setSourcePath] = useState("");
+  const [library, setLibrary] = useState<SkillLibraryView | undefined>(undefined);
+  const [libraryError, setLibraryError] = useState<string | undefined>(undefined);
+  const [entry, setEntry] = useState("");
   const [url, setUrl] = useState("");
   const [picked, setPicked] = useState<{ label: string; files: SkillFilePayload[] } | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const dirInputRef = useRef<HTMLInputElement | null>(null);
   const zipInputRef = useRef<HTMLInputElement | null>(null);
+
+  // 切到「技能库」时拉取可安装条目；首次进入自动选中第一条。
+  useEffect(() => {
+    if (mode !== "library") return;
+    let alive = true;
+    setLibraryError(undefined);
+    api
+      .sources()
+      .then((view) => {
+        if (!alive) return;
+        setLibrary(view);
+        setEntry(view.skills[0]?.entry ?? "");
+      })
+      .catch((error) => {
+        if (alive) setLibraryError(String(error));
+      });
+    return () => {
+      alive = false;
+    };
+  }, [mode, api]);
 
   /** 选中单个 .md 文件（flat 安装）。 */
   const onPickFile = async (input: HTMLInputElement) => {
@@ -585,8 +607,8 @@ function InstallDialog({
       const result =
         mode === "upload"
           ? await api.installUpload({ files: picked?.files ?? [], overwrite })
-          : mode === "path"
-            ? await api.installFromPath({ sourcePath: sourcePath.trim(), overwrite })
+          : mode === "library"
+            ? await api.installFromLibrary({ entry, overwrite })
             : await api.installFromUrl({ url: url.trim(), overwrite });
       if (!result.ok) {
         setErrors(result.errors);
@@ -601,7 +623,7 @@ function InstallDialog({
   };
 
   const canSubmit =
-    !busy && hasWorkspace && (mode === "upload" ? picked !== undefined : mode === "path" ? sourcePath.trim().length > 0 : url.trim().length > 0);
+    !busy && hasWorkspace && (mode === "upload" ? picked !== undefined : mode === "library" ? entry.length > 0 : url.trim().length > 0);
 
   return (
     <Modal title="安装技能" onClose={onClose}>
@@ -646,16 +668,30 @@ function InstallDialog({
           </div>
         )}
 
-        {mode === "path" && (
+        {mode === "library" && (
           <div className="skp-field">
-            <span className="skp-field-label">宿主上的源路径</span>
-            <input
-              className="skp-input"
-              type="text"
-              placeholder="/path/to/skill 目录或 <名称>.md"
-              value={sourcePath}
-              onChange={(e) => setSourcePath(e.target.value)}
-            />
+            <span className="skp-field-label">技能库</span>
+            {libraryError !== undefined && <div className="skp-error">{libraryError}</div>}
+            {library !== undefined && library.dir === undefined && (
+              <span className="skp-note">
+                未配置技能库目录。请在插件配置中设置 skillLibrary，或设置环境变量 DSH_SKILL_LIBRARY。
+              </span>
+            )}
+            {library !== undefined && library.dir !== undefined && library.skills.length === 0 && (
+              <span className="skp-note">技能库为空：{library.dir}</span>
+            )}
+            {library !== undefined && library.skills.length > 0 && (
+              <>
+                <SkpSelect
+                  value={entry}
+                  ariaLabel="技能库条目"
+                  options={library.skills.map((skill) => ({ value: skill.entry, label: skill.name, hint: skill.description }))}
+                  onChange={setEntry}
+                />
+                <span className="skp-note">目录：{library.dir}</span>
+              </>
+            )}
+            {library !== undefined && library.errors.length > 0 && <div className="skp-error">{library.errors.join("\n")}</div>}
           </div>
         )}
 
