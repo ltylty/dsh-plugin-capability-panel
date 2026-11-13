@@ -66,17 +66,9 @@ export function CapabilityPanel({ api, onClose }: { api: CapabilityPanelApi; onC
       <header className="skp-header">
         <div className="skp-title-row">
           <div className="skp-title-main">
-            <h2>工作区技能</h2>
-            {workspace !== undefined && (
-              <span className="skp-workspace" title={workspace}>
-                {workspace}
-              </span>
-            )}
-          </div>
-          <div className="skp-title-tools">
             {(workspaceOptions.length > 0 || workspaceValue.length > 0) && (
               <SkpSelect
-                className="skp-dd-scope"
+                className="skp-dd-workspace"
                 value={workspaceValue}
                 title={workspaceValue}
                 ariaLabel="工作区"
@@ -84,6 +76,9 @@ export function CapabilityPanel({ api, onClose }: { api: CapabilityPanelApi; onC
                 onChange={(value) => api.selectProject(value)}
               />
             )}
+            <h2>工作区技能</h2>
+          </div>
+          <div className="skp-title-tools">
             {onClose !== undefined && (
               <button className="skp-close" type="button" aria-label="关闭工作区技能" title="关闭面板" onClick={onClose}>
                 ✕
@@ -483,7 +478,7 @@ function skillRef(summary: ClientSkillSummary): SkillRef {
 // ---------------------------------------------------------------------------
 
 /** 安装对话框的来源模式与 Tab 文案。 */
-const INSTALL_MODE = { upload: "上传", library: "技能库", url: "URL" } as const;
+const INSTALL_MODE = { upload: "上传", library: "预置", url: "URL" } as const;
 type InstallMode = keyof typeof INSTALL_MODE;
 
 /**
@@ -514,7 +509,7 @@ function InstallDialog({
   const dirInputRef = useRef<HTMLInputElement | null>(null);
   const zipInputRef = useRef<HTMLInputElement | null>(null);
 
-  // 切到「技能库」时拉取可安装条目；首次进入自动选中第一条。
+  // 切到「预置」时拉取可安装条目；首次进入自动选中第一条。
   useEffect(() => {
     if (mode !== "library") return;
     let alive = true;
@@ -670,21 +665,21 @@ function InstallDialog({
 
         {mode === "library" && (
           <div className="skp-field">
-            <span className="skp-field-label">技能库</span>
+            <span className="skp-field-label">预置</span>
             {libraryError !== undefined && <div className="skp-error">{libraryError}</div>}
             {library !== undefined && library.dir === undefined && (
               <span className="skp-note">
-                未配置技能库目录。请在插件配置中设置 skillLibrary，或设置环境变量 DSH_SKILL_LIBRARY。
+                未配置预置技能目录。请在插件配置中设置 skillLibrary，或设置环境变量 DSH_SKILL_LIBRARY。
               </span>
             )}
             {library !== undefined && library.dir !== undefined && library.skills.length === 0 && (
-              <span className="skp-note">技能库为空：{library.dir}</span>
+              <span className="skp-note">预置技能为空：{library.dir}</span>
             )}
             {library !== undefined && library.skills.length > 0 && (
               <>
                 <SkpSelect
                   value={entry}
-                  ariaLabel="技能库条目"
+                  ariaLabel="预置技能条目"
                   options={library.skills.map((skill) => ({ value: skill.entry, label: skill.name, hint: skill.description }))}
                   onChange={setEntry}
                 />

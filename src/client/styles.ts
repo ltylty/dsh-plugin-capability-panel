@@ -37,10 +37,9 @@ export const SKP_CSS = `
 .skp-panel *{box-sizing:border-box;}
 .skp-header{flex:none;display:flex;flex-direction:column;gap:14px;padding:18px 20px 14px;border-bottom:1px solid var(--skp-border);}
 .skp-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;}
-.skp-title-main{display:flex;align-items:baseline;gap:10px;min-width:0;}
+.skp-title-main{display:flex;align-items:center;gap:12px;min-width:0;}
 .skp-title-main h2{margin:0;font-size:17px;font-weight:600;letter-spacing:.01em;}
 .skp-title-tools{display:flex;align-items:center;gap:10px;flex:none;min-width:0;}
-.skp-workspace{font-size:12.5px;color:var(--skp-text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .skp-close{flex:none;display:grid;place-items:center;width:30px;height:30px;background:none;border:none;border-radius:var(--skp-radius-sm);color:var(--skp-text-3);font-size:13px;line-height:1;cursor:pointer;transition:background-color .15s var(--skp-ease),color .15s var(--skp-ease);}
 .skp-close:hover{background:var(--skp-hover);color:var(--skp-text);}
 .skp-foot{position:relative;}
@@ -121,7 +120,9 @@ export const SKP_CSS = `
 .skp-dot-enabled{background:var(--skp-success);box-shadow:0 0 0 3px color-mix(in srgb,var(--skp-success) 18%,transparent);}
 .skp-dot-partial{background:var(--skp-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--skp-accent) 18%,transparent);}
 .skp-dd{position:relative;display:inline-block;min-width:0;}
-.skp-dd-scope{max-width:250px;}
+.skp-dd-workspace{flex:0 1 auto;width:min(380px,56vw);max-width:380px;}
+.skp-dd-workspace .skp-dd-btn{height:38px;padding:0 34px 0 14px;font-size:14px;font-weight:600;color:var(--skp-text);border-color:var(--skp-border-strong);background-color:var(--skp-fill);background-position:right 12px center;}
+.skp-dd-workspace .skp-dd-btn:hover:not(:disabled){background-color:var(--skp-hover);}
 .skp-dd-btn{display:inline-flex;align-items:center;gap:8px;width:100%;height:34px;padding:0 30px 0 12px;border:1px solid var(--skp-border);border-radius:var(--skp-radius-sm);font:inherit;font-size:13px;background:var(--skp-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b95a1' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center/12px 12px;color:var(--skp-text-2);cursor:pointer;outline:none;text-align:left;transition:border-color .15s var(--skp-ease),box-shadow .15s var(--skp-ease),color .15s var(--skp-ease);}
 .skp-dd-btn:hover:not(:disabled){border-color:var(--skp-border-strong);color:var(--skp-text);}
 .skp-dd-btn:focus-visible{border-color:var(--skp-border-strong);box-shadow:0 0 0 3px var(--dsw-alias-interactive-bg-active,rgba(20,28,40,.08));}
