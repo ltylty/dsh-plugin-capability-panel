@@ -1,52 +1,32 @@
 /**
  * 按 session 隔离的 MCP 自动挂载器。
  *
- * 在宿主根上下文上监听 `agent/created`，为每个新 agent 解析合并后的 MCP
- * 配置（全局 `<agentsHome>/mcp.json`，兼容旧位置 dsh home / `~/.claude`；
- * + 项目 `<projectRoot>/.mcp.json`，同名键项目覆盖全局），然后把每个启用的
- * 条目以
- * `agent.ctx.plugin(dsh-mcp-client, config)` 的形式
- * **挂在 agent 自己的 Cordis 上下文上**（插件实例优先取宿主那份，见
+ * 在宿主根上下文上监听 `agent/created`，为每个新 agent 读取项目级
+ * `<projectRoot>/.mcp.json`，把每个启用的条目以
+ * `agent.ctx.plugin(dsh-mcp-client, config)` 的形式**挂在 agent 自己的
+ * Cordis 上下文上**（插件实例优先取宿主那份，见
  * {@link createMcpClientResolver}），因此：
  *
  *   - 工具（`mcp__<serverName>__*`）只在该 session 内可见，agent 被释放时
  *     自动消失；
  *   - A 项目的 session 永远不会看到 B 项目的 server。
  *
- * 剩下一个继承自桥接层的限制，在这里显式暴露而非隐藏：
- *
- *   - 桥接层按 **注册作用域** 预留 `serverName`。挂宿主那份实例时作用域是
- *     agent，每个 session 各自挂一份，互不冲突；只有回落到本插件自带的旧
- *     副本（0.1.0-rc.8，按 `ctx.root` 预留，见
- *     {@link createMcpClientResolver}）时，同一 server 全应用才只允许一个
- *     session 挂载，其余 session 在状态视图里报 `conflict`（带友好文案）
- *     而不是抛错——面板聚合时以"任一 session 已挂载"为准，重复冲突不影响
- *     展示；
- *   - 面板的写操作调用 {@link McpLoader.reload}，dispose 掉受影响 session
- *     的旧挂载并重新挂载。
+ * 面板的写操作调用 {@link McpLoader.reload}，dispose 掉受影响 session 的
+ * 旧挂载并重新挂载。
  *
  * @module @chengdb/capability-panel/mcp/loader
  */
 
-import { locateConfigFile } from "../shared/config-location.js";
 import { errMessage } from "../shared/errors.js";
 import { findProjectRoot } from "../shared/project-root.js";
 import { readMcpFile, toClientConfig } from "./config-file.js";
-import { GLOBAL_MCP_FILE_NAME, globalMcpDirs, projectMcpFile } from "./paths.js";
-import type { OverridesManager } from "../overrides/manager.js";
-import type { ImportsManager } from "../imports/manager.js";
+import { projectMcpFile } from "./paths.js";
 import type { McpServerEntry, McpStatusView } from "./types.js";
 
 /** 挂载器的构造依赖。 */
 export interface McpLoaderDeps {
-  dshHome?: string;
-  agentsHome?: string;
   /** 为 false 时不挂载任何 server（状态保持为空）。缺省 true。 */
   enabled?: boolean;
-  /** 项目级"全局能力禁用"管理器：解析项目配置时跳过被禁用的全局 server。 */
-  overrides?: OverridesManager;
-  /** 项目级「全局能力引用」管理器：引用与项目原生条目同级参与合并。 */
-  imports?: ImportsManager;
 }
 
 /** 一条 server 在一个 session 内的挂载记录。 */
@@ -83,15 +63,9 @@ export interface McpLoader {
 /**
  * 解析要挂载的 MCP 桥接插件实例（懒加载 + 缓存一次）。
  *
- * **必须优先用宿主自己的那份** `@deepseek-ai/dsh-mcp-client`：本插件
- * `dependencies` 里那份副本（0.1.0-rc.8）按 `ctx.root` 预留 `serverName`，
- * 全应用只允许一个 session 挂上同名 server；宿主那份（0.1.5-rc.2 起）按
- * agent 作用域预留（`scopeOf(ctx) ?? ctx.root`），多会话才能各自拿到工具。
- * 升级依赖版本解决不了这件事：插件自带的 `@deepseek-ai/dsh-scope` 副本里
- * `kScope` 是每份模块实例独有的 Symbol，`scopeOf()` 读不到宿主打在 agent
- * ctx 上的 scope tag，仍旧回落 `ctx.root`。因此按包名向宿主的 loader 取
- * 实例（加载本插件用的就是它，解析基准是 profile 目录）；宿主没有 loader
- * 时（headless 等）才回落到自带副本。
+ * **必须优先用宿主自己的那份** `@deepseek-ai/dsh-mcp-client`：宿主那份按
+ * agent 作用域预留 `serverName`，多会话才能各自拿到工具；插件自带副本
+ * 只在宿主没有 loader 时（headless 等）兜底。
  */
 function createMcpClientResolver(ctx: any): () => Promise<any> {
   let resolved: Promise<any> | undefined;
@@ -122,70 +96,26 @@ export function createMcpLoader(ctx: any, deps: McpLoaderDeps = {}): McpLoader {
   const logger = ctx.logger ?? console;
   const mcpClient = createMcpClientResolver(ctx);
 
-  /**
-   * 为某个工作区解析合并后的启用 server 列表：
-   * 先全局后项目（同名键项目覆盖），最后过滤掉 disabled 条目。
-   * 传 cwd 时先应用该项目级"全局能力禁用"：被禁用的**全局** server 直接跳过
-   * （项目自身的同名条目不受影响，仍能覆盖挂载）。
-   * 项目级引用（`.agents/capability-imports.json`）在全局之后、项目原生之前
-   * 参与合并：引用内容实时取自全局条目，`disabled` 标记即本项目不挂载
-   * （全局配置不动）；同名项目原生条目恒优先。引用是显式的项目级声明，
-   * 因此即使全局条目在 overrides 里被本项目禁用，引用仍然生效。
-   * 单个文件读失败只记 warn，不中断另一个文件。
-   */
+  /** 为某个工作区解析项目配置里的启用 server 列表。 */
   async function resolveServers(cwd: string | undefined): Promise<Array<{ key: string; entry: McpServerEntry }>> {
-    // 全局配置读取生效位置（.agents 首选，兼容旧位置 dsh home / ~/.claude）。
-    const globalFile = locateConfigFile(globalMcpDirs(deps), GLOBAL_MCP_FILE_NAME).readFile;
-    // 项目级禁用的全局 server 键集合（无 cwd 或读取失败时为空集合）。
-    const disabledMcp = new Set((await deps.overrides?.sets(cwd))?.mcp ?? []);
-    // 两个配置文件并行解析；单个文件读失败只记 warn，不中断另一个。
-    const [globalServers, projectServers] = await Promise.all([
-      readMcpFile(globalFile).catch((error) => {
-        logger.warn?.(`capability-panel: ${errMessage(error)}`);
-        return {} as Record<string, McpServerEntry>;
-      }),
-      cwd !== undefined
-        ? readMcpFile(projectMcpFile(cwd)).catch((error) => {
-            logger.warn?.(`capability-panel: ${errMessage(error)}`);
-            return {} as Record<string, McpServerEntry>;
-          })
-        : Promise.resolve({} as Record<string, McpServerEntry>),
-    ]);
-    // 项目级引用表（无 cwd 或读失败时为空表）。
-    const refs = cwd !== undefined && deps.imports !== undefined ? await deps.imports.entries(cwd, "mcp") : {};
-    const merged = new Map<string, McpServerEntry>();
-    for (const [key, entry] of Object.entries(globalServers)) {
-      if (disabledMcp.has(key)) continue;
-      merged.set(key, entry);
-    }
-    // 引用：遮蔽全局原版（引用即项目级生效条目）；悬空引用（全局已删）忽略。
-    // 启用态的引用**清除**全局条目自身的 disabled 默认（项目级选用，与项目
-    // 原生条目的合并口径一致）；禁用态的引用显式置 disabled（本项目不挂载）。
-    for (const [key, ref] of Object.entries(refs)) {
-      const globalEntry = Object.hasOwn(globalServers, key) ? globalServers[key] : undefined;
-      if (globalEntry === undefined) continue;
-      const resolved = { ...globalEntry };
-      if (ref.disabled === true) resolved.disabled = true;
-      else delete resolved.disabled;
-      merged.set(key, resolved);
-    }
-    for (const [key, entry] of Object.entries(projectServers)) merged.set(key, entry);
-    return [...merged.entries()]
+    if (cwd === undefined) return [];
+    const servers = await readMcpFile(projectMcpFile(cwd)).catch((error) => {
+      logger.warn?.(`capability-panel: ${errMessage(error)}`);
+      return {} as Record<string, McpServerEntry>;
+    });
+    return Object.entries(servers)
       .filter(([, entry]) => entry.disabled !== true)
       .map(([key, entry]) => ({ key, entry }));
   }
 
   /**
-   * 重挂一个 session：先 dispose 上一代 fiber（释放桥接层按 app 预留的
-   * serverName），再逐个挂载本代。同步风格的配置/命名空间失败会被归因到
-   * 具体条目上；`failOnStartupError: false` 保证不可达 server 依然能 resolve
-   * （重连交由桥接层处理）。
+   * 重挂一个 session：先 dispose 上一代 fiber，再逐个挂载本代。
+   * `failOnStartupError: false` 保证不可达 server 依然能 resolve。
    */
   async function remount(record: SessionRecord): Promise<void> {
     const previous = record.fibers;
     record.fibers = [];
     record.mounts = [];
-    // 上一代 fiber 并联释放（各 fiber 独立，失败不挡住新一代挂载）。
     await Promise.all(previous.map((fiber) => fiber.dispose().catch(() => undefined)));
     if (!enabled) return;
     const servers = await resolveServers(record.cwd);
@@ -200,10 +130,6 @@ export function createMcpLoader(ctx: any, deps: McpLoaderDeps = {}): McpLoader {
         record.mounts.push({ key, serverName, state: "mounted" });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        // 桥接层对同名 serverName 冲突的报错包含 "already in use"。这是
-        // 预期行为而非配置错误：同一 serverName 全应用仅挂载一份，其余
-        // session 报同名冲突。面板聚合时以"任一 session 已挂载"为准，
-        // 这里只把错误文案换成人话，避免误导用户去改 serverName。
         const conflict = /already in use/.test(message);
         const note = "同一 serverName 全应用仅挂载一份：已由本应用的其他会话挂载，本会话不重复挂载";
         record.mounts.push({ key, serverName, state: conflict ? "conflict" : "failed", error: conflict ? note : message });
@@ -239,13 +165,10 @@ export function createMcpLoader(ctx: any, deps: McpLoaderDeps = {}): McpLoader {
   }
 
   if (enabled) {
-    // 新 agent 创建 / 释放时维护簿记（挂载的 fiber 由 agent 上下文自动解绑，
-    // 这里只需清掉记录）。
     ctx.on("agent/created", ({ agent }: any) => mountAgent(agent));
     ctx.on("agent/disposed", ({ agent }: any) => {
       if (agent?.id !== undefined) sessions.delete(agent.id);
     });
-    // 插件加载时已经存活的 agent（resume / 历史 session）补挂。
     for (const agent of ctx.get("agents")?.list?.() ?? []) {
       mountAgent(agent);
     }

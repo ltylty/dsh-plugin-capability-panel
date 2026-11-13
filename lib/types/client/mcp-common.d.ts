@@ -1,11 +1,9 @@
 /**
- * MCP 域在客户端面板与输入框快捷弹层之间共用的挂载状态模型。
+ * MCP 域在客户端面板中使用的挂载状态模型。
  *
- * mcp-panel.tsx 与 composer-mcp.tsx 原本各复制了一份：
- *   - `MountInfo` 类型与 `MOUNT_LABEL` 文案（仅冲突文案差一小截）；
+ *   - `MountInfo` 类型与 `MOUNT_LABEL` 文案；
  *   - 把多个 session 的挂载状态按 server.key 聚合、取"最差"状态的循环
  *     （conflict > failed > mounted）。
- * 这里收敛成一份，两处加载逻辑共用同一口径，避免将来改语义时漏改一处。
  *
  * @module @chengdb/capability-panel/client/mcp-common
  */

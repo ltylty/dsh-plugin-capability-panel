@@ -1,24 +1,16 @@
 /**
- * MCP 管理服务（挂载为 `ctx.capabilityPanel.mcp`）：对项目/全局 MCP 配置
- * 文件的 CRUD，叠加 loader 报告的实时挂载状态。
+ * MCP 管理服务（挂载为 `ctx.capabilityPanel.mcp`）：对项目级 MCP 配置
+ * 文件 `<项目根>/.mcp.json` 的 CRUD，叠加 loader 报告的实时挂载状态。
  *
- * 每次成功写入都会触发一次针对性的 loader reload，让改动无需重启即可在
- * 存活 session 中生效（项目写入只重挂该项目根的 session；全局写入重挂全部）。
+ * 每次成功写入都会触发一次针对该项目的 loader reload，让改动无需重启即可
+ * 在存活 session 中生效。
  *
  * @module @chengdb/capability-panel/mcp/manager
  */
-import type { OverridesManager } from "../overrides/manager.js";
-import type { ImportsManager } from "../imports/manager.js";
-import type { McpListResult, McpScope, McpServerEntry, McpStatusView } from "./types.js";
+import type { McpListResult, McpServerEntry, McpStatusView } from "./types.js";
 import type { McpLoader } from "./loader.js";
-/** 管理服务的构造依赖。 */
-export interface McpManagerDeps {
-    dshHome?: string;
-    agentsHome?: string;
-}
-/** 一次写操作的最小入参（scope + 目标文件定位）。 */
+/** 一次写操作的最小入参。 */
 export interface McpWriteInput {
-    scope: McpScope;
     /** 项目作用域必填：工作区目录。 */
     cwd?: string;
     key: string;
@@ -35,20 +27,13 @@ export type McpOpResult = {
     errors: string[];
 };
 /** 创建管理服务；loader 由 index.ts 注入（自动挂载与状态共用同一实例）。 */
-export declare function createMcpManager(deps: McpManagerDeps, loader: McpLoader, overrides?: OverridesManager, imports?: ImportsManager): {
+export declare function createMcpManager(loader: McpLoader): {
     list: (cwd?: string) => Promise<McpListResult>;
     upsert: (input: McpUpsertInput) => Promise<McpOpResult>;
     remove: (input: McpWriteInput) => Promise<McpOpResult>;
     setEnabled: (input: McpWriteInput & {
         enabled: boolean;
     }) => Promise<McpOpResult>;
-    importToProject: (input: {
-        cwd?: string;
-        key: string;
-        overwrite?: boolean;
-    }) => Promise<McpOpResult & {
-        existed?: boolean;
-    }>;
     status: (cwd?: string) => McpStatusView[];
 };
 /** 管理服务的完整类型（构造函数的返回值）。 */

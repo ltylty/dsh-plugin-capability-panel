@@ -6,9 +6,9 @@
  * 外部化）；这里的源码只导出 `inject` 与 `apply`。
  *
  * 面板入口位于**侧栏底部**：向根作用域的 `sidebar.footer.action` 列表槽
- * （kind `list`、replace-risk `none`）注册一个按钮，摆放在 Settings 旁边；
- * 点击后在其上方弹出锚定浮层面板。纯增量——不遮蔽任何内置 UI，也不绑定
- * 任何 session。
+ * 注册一个按钮，摆放在 Settings 旁边；点击后在其上方弹出锚定浮层面板。
+ * 面板默认定位到**当前会话的工作区**，右上角下拉框可切换到其它已注册
+ * 工作区（不提供"跟随当前会话"选项）。
  *
  * @module @chengdb/capability-panel/client
  */
@@ -17,66 +17,46 @@ import { createElement } from "react";
 import { createPanelApi } from "./client/api-adapter.js";
 import { installStyles } from "./client/styles.js";
 import { CapabilitiesFooterAction } from "./client/panel.js";
-import { ComposerMcpButton, ComposerMcpOverlay } from "./client/composer-mcp.js";
-import { ComposerSkillsButton, ComposerSkillsOverlay } from "./client/composer-skills.js";
-import { ComposerQuickButton, ComposerQuickOverlay } from "./client/composer-quick.js";
 
 /** locale 字典的命名空间。 */
 const NS = "capabilityPanel";
 
-/**
- * 简体中文词典。
- * 注意：当前面板组件直接使用硬编码文案（见 panel.tsx / mcp-panel.tsx /
- * quick-messages-panel.tsx），这组 dictionary 注册后暂无组件读取，属于
- * 后续接入本地化的预留脚手架，两边内容暂时一致。
- */
+/** 简体中文词典（预留脚手架，组件当前硬编码文案）。 */
 const zh = {
-  "panel.title": "能力面板",
+  "panel.title": "工作区技能",
   "panel.domain.skills": "技能",
   "panel.domain.mcp": "MCP",
-  "panel.scope.all": "全部",
-  "panel.scope.project": "项目",
-  "panel.scope.global": "全局",
   "panel.search": "搜索…",
   "panel.loading": "加载中…",
   "panel.empty": "没有匹配项。",
-  "panel.readonly": "只读",
   "panel.none": "（无工作区）",
 };
 
-/** 英文词典，键集合与 zh 完全一致（类型上互相约束，防止漏键）。 */
+/** 英文词典，键集合与 zh 完全一致。 */
 const en: Record<keyof typeof zh, string> = {
-  "panel.title": "Capabilities",
+  "panel.title": "Workspace Skills",
   "panel.domain.skills": "Skills",
   "panel.domain.mcp": "MCP",
-  "panel.scope.all": "All",
-  "panel.scope.project": "Project",
-  "panel.scope.global": "Global",
   "panel.search": "Search…",
   "panel.loading": "Loading…",
   "panel.empty": "Nothing matches.",
-  "panel.readonly": "Read-only",
   "panel.none": "(no workspace)",
 };
 
 /** 客户端强依赖的服务。 */
 export const inject = ["connection", "slots", "locale", "workspaces"];
 
-/**
- * 客户端插件主体：注入样式、注册 locale、构造传输适配器、注册侧栏入口。
- */
+/** 客户端插件主体：注入样式、注册 locale、构造传输适配器、注册侧栏入口。 */
 export function apply(ctx: any) {
   const disposers: Array<() => void> = [];
   disposers.push(installStyles());
 
-  // 注册 locale 词典（命名空间隔离，见上方注释——目前为预留脚手架）。
   if (ctx.locale?.register) {
     disposers.push(ctx.locale.register(NS, { zh, en }));
   }
 
-  // 构建传输无关的面板 API（CapabilityPanelApi）。面板可以在头部下拉框里
-  // 钉选一个项目（selection.cwd）；未钉选时，"project" 作用域跟随当前
-  // session 的工作区，其次是最新使用过的工作区。
+  // 当前工作区是异步解析的 SnapshotStore；订阅图变化后，cwd 或工作区列表
+  // 真正变化时通知面板刷新。
   const workspaceListeners = new Set<() => void>();
   const notifyWorkspaceListeners = () => {
     for (const listener of workspaceListeners) {
@@ -87,11 +67,14 @@ export function apply(ctx: any) {
       }
     }
   };
-  // 钉选状态：cwd 为 undefined 表示"跟随当前 session / 最近工作区"。
+
+  // 下拉框的显式选择；undefined = 使用当前会话工作区（默认定位）。
   const selection: { cwd: string | undefined } = { cwd: undefined };
+  const effectiveCwd = () => selection.cwd ?? currentWorkspaceCwd(ctx);
+
   const api = createPanelApi({
     rpc: ctx.get("connection")?.rpc,
-    currentWorkspaceCwd: () => selection.cwd ?? currentWorkspaceCwd(ctx),
+    currentWorkspaceCwd: effectiveCwd,
     subscribeWorkspace: (listener) => {
       workspaceListeners.add(listener);
       return () => {
@@ -99,7 +82,6 @@ export function apply(ctx: any) {
       };
     },
     listProjects: () => listWorkspaceOptions(ctx),
-    selectedProject: () => selection.cwd,
     selectProject: (path) => {
       if (selection.cwd === path) return;
       selection.cwd = path;
@@ -107,15 +89,10 @@ export function apply(ctx: any) {
     },
   });
 
-  // sessions / workspaces 的基线都是异步解析的 SnapshotStore，所以订阅图
-  // 变化：当解析出的 cwd（或工作区列表本身）变化时重新读取两份快照并
-  // 通知面板（下拉框选项要跟着新增/移除的工作区刷新，不只是 cwd 移动；
-  // 钉选状态下的通知同样是为了刷新下拉框选项）。只有快照内容真正变化
-  // 时才通知，避免无意义的重渲染。
-  let lastCwd = selection.cwd ?? currentWorkspaceCwd(ctx);
+  let lastCwd = effectiveCwd();
   let lastItemsKey = workspaceItemsKey(ctx);
   const onGraphChange = () => {
-    const next = selection.cwd ?? currentWorkspaceCwd(ctx);
+    const next = effectiveCwd();
     const itemsKey = workspaceItemsKey(ctx);
     if (next === lastCwd && itemsKey === lastItemsKey) return;
     lastCwd = next;
@@ -128,75 +105,13 @@ export function apply(ctx: any) {
   if (typeof unsubWorkspaces === "function") disposers.push(unsubWorkspaces);
 
   // 注册侧栏底部入口（Settings 旁的按钮，点击切换 popover）。
-  // `sidebar.footer.action` 是根作用域列表槽（replace-risk "none"）：
-  // 纯增量、不绑定 session。内置的 cordis 面板已在此槽（id "cordis-panel"），
-  // order 10 让我们的按钮排在其后。owner props 为 `{ wide }`——
-  // false 表示侧栏收窄成 56px 的竖条，此时隐藏文字标签。
   if (ctx.slots?.inject && ctx.slots.register) {
     const dispose = ctx.slots.inject("sidebar.footer.action", () =>
-      ctx.slots.register({ name: "sidebar.footer.action", id: "capability-panel", order: 10, label: "能力面板" }, (props: { wide?: boolean }) =>
+      ctx.slots.register({ name: "sidebar.footer.action", id: "capability-panel", order: 10, label: "工作区技能" }, (props: { wide?: boolean }) =>
         CapabilitiesFooterAction({ api, wide: props?.wide !== false }),
       ),
     );
     if (typeof dispose === "function") disposers.push(dispose);
-  }
-
-  // 输入框工具行的能力工具组：快捷消息（见 composer-quick.tsx）、
-  // Skills 快捷输入（见 composer-skills.tsx）与 MCP 快捷开关（见
-  // composer-mcp.tsx）三个按钮合并在同一个 `conversation.input.left` 条目里
-  // （圆角容器 + 2px 间距，视觉上是一个按钮组），顺序与面板域 Tab 一致：
-  // 快捷消息 / Skills / MCP。按钮从 owner props（InputZone）读 input
-  // 草稿快照；三个弹层仍分别注册在 `conversation.input.overlay`，开合状态
-  // 各自独立、外部点击互斥关闭。Skills 与快捷消息弹层从 session 标准套件
-  // 读 useInput / inputActions：Skills 点击某行把 `/name ` 追加进草稿（宿主
-  // ui-skill '/' 源的同款口令形式），快捷消息点击把正文追加进草稿。
-  if (ctx.slots?.inject && ctx.slots.register) {
-    const disposeTools = ctx.slots.inject("conversation.input.left", () =>
-      ctx.slots.register({ name: "conversation.input.left", id: "capability-panel-tools", order: 10, label: "能力工具" }, (props: any) =>
-        createElement(
-          "div",
-          { className: "skp-composer-tools" },
-          ComposerQuickButton(),
-          ComposerSkillsButton({ api, draft: typeof props?.input?.draft === "string" ? props.input.draft : "" }),
-          ComposerMcpButton({ api }),
-        ),
-      ),
-    );
-    if (typeof disposeTools === "function") disposers.push(disposeTools);
-    const disposeSkillsOverlay = ctx.slots.inject("conversation.input.overlay", () =>
-      ctx.slots.register({ name: "conversation.input.overlay", id: "capability-panel-skills", order: 5, label: "Skills" }, (props: any) =>
-        ComposerSkillsOverlay({
-          api,
-          useInput: typeof props?.useInput === "function" ? props.useInput : undefined,
-          inputActions: typeof props?.inputActions?.setDraft === "function" ? props.inputActions : undefined,
-        }),
-      ),
-    );
-    if (typeof disposeSkillsOverlay === "function") disposers.push(disposeSkillsOverlay);
-
-    // 快捷消息的弹层（按钮已并入上方"能力工具"组条目）：同样注册在
-    // `conversation.input.overlay`，与 Skills 弹层共用 session 标准套件的
-    // useInput / inputActions。
-    const disposeQuickOverlay = ctx.slots.inject("conversation.input.overlay", () =>
-      ctx.slots.register({ name: "conversation.input.overlay", id: "capability-panel-quick", order: 7, label: "快捷消息" }, (props: any) =>
-        ComposerQuickOverlay({
-          api,
-          useInput: typeof props?.useInput === "function" ? props.useInput : undefined,
-          inputActions: typeof props?.inputActions?.setDraft === "function" ? props.inputActions : undefined,
-        }),
-      ),
-    );
-    if (typeof disposeQuickOverlay === "function") disposers.push(disposeQuickOverlay);
-
-    // MCP 快捷开关的弹层（按钮已并入上方"能力工具"组条目）：同样注册在
-    // `conversation.input.overlay`。开合状态由 composer-mcp 模块内的微存储
-    // 跨两棵 React 树共享。
-    const disposeOverlay = ctx.slots.inject("conversation.input.overlay", () =>
-      ctx.slots.register({ name: "conversation.input.overlay", id: "capability-panel-mcp", order: 10, label: "MCP 服务器" }, () =>
-        ComposerMcpOverlay({ api }),
-      ),
-    );
-    if (typeof disposeOverlay === "function") disposers.push(disposeOverlay);
   }
 
   ctx.effect?.(() => () => {
@@ -209,12 +124,8 @@ export function apply(ctx: any) {
  *
  * 最高保真来源是当前 session 自己的工作目录（`sessions.list` →
  * `byId[current].cwd`）；session 存在但还没有 cwd 时，回退到包含它的
- * Workspace；没有当前 session 时（例如从 hero 屏打开设置）用最近活跃的
- * workspace，再退到第一个注册的 workspace。
- *
- * 注意：workspaces 快照在 `workspaces.list`（SnapshotStore）上——服务本身
- * 没有 getSnapshot，且没有 `current` 字段；它暴露 `items` /
- * `recentWorkspaceId` / `baselinesReady`。
+ * Workspace；没有当前 session 时用最近活跃的 workspace，再退到第一个注册的
+ * workspace。
  */
 function currentWorkspaceCwd(ctx: any): string | undefined {
   let current: string | undefined;
@@ -251,8 +162,6 @@ function currentWorkspaceCwd(ctx: any): string | undefined {
 /** 读取已知工作区，供面板的项目下拉框使用。 */
 function listWorkspaceOptions(ctx: any): Array<{ id: string; path: string; title?: string }> {
   try {
-    // WorkspaceRuntime.list 是 SnapshotStore——服务本身没有 getSnapshot
-    // （早期直接调 `workspaces.getSnapshot()` 正是下拉框为空的 bug 根源）。
     const items: Array<{ workspaceId?: string; path?: string; title?: string }> =
       ctx.get("workspaces")?.list?.getSnapshot?.()?.items ?? [];
     return items
@@ -267,9 +176,9 @@ function listWorkspaceOptions(ctx: any): Array<{ id: string; path: string; title
   }
 }
 
-/** 工作区列表的廉价变更检测键（用于判断是否需要刷新下拉框）。 */
+/** 工作区列表的廉价变更检测键。 */
 function workspaceItemsKey(ctx: any): string {
   return listWorkspaceOptions(ctx)
-    .map((o) => `${o.id}:${o.path}:${o.title ?? ""}`)
+    .map((o) => o.id + ":" + o.path + ":" + (o.title ?? ""))
     .join("|");
 }

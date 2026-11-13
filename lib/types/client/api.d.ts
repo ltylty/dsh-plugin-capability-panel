@@ -5,15 +5,12 @@
  * （插件自有通道 `/capability-panel` 上的 RPC，见 api-adapter.ts）由
  * `src/client.ts` 组装注入。
  *
- * 客户端类型（`Client*` 前缀）刻意与宿主类型（skills/types、mcp/types）
- * 保持独立：这是传输边界，宿主侧的类型（如 McpStatusView）是 Cordis
- * 运行时的概念，不能直接依赖。
+ * 客户端类型（`Client*` 前缀）刻意与宿主类型保持独立：这是传输边界。
  *
  * @module @chengdb/capability-panel/client/api
  */
-import type { SkillFormat, SkillSpec, WritableScope } from "../skills/types.js";
-import type { McpScope, McpServerEntry } from "../mcp/types.js";
-import type { CapabilityDomain } from "../overrides/types.js";
+import type { SkillFormat, SkillSpec } from "../skills/types.js";
+import type { McpServerEntry } from "../mcp/types.js";
 /** 面板列表里的一行 skill 摘要（调用策略已拍平为两个布尔）。 */
 export interface ClientSkillSummary {
     name: string;
@@ -23,21 +20,7 @@ export interface ClientSkillSummary {
     userInvocable: boolean;
     source: string;
     format: SkillFormat;
-    readOnly: boolean;
     path?: string;
-    /** 可写条目所属的受管根目录（写回/导出/导入时按 root 精确寻址）。 */
-    root?: string;
-    /**
-     * 为 true 表示本条目是「项目内禁用全局」生成的屏蔽占位（shadow stub）：
-     * 按宿主 rank 遮蔽同名全局条目，使其在本项目不可调用；删除它即恢复。
-     */
-    shadowStub?: boolean;
-    /**
-     * 仅全局条目携带：当前项目对它的遮蔽状态。
-     * `stub` = 项目区已有屏蔽占位（本项目内已禁用，可「恢复」）；
-     * `skill` = 项目区已有同名真实条目（项目副本遮蔽全局）。
-     */
-    projectShadow?: "stub" | "skill";
 }
 /** skill 详情 = 摘要 + 完整 spec + 正文 + 资源文件列表。 */
 export interface ClientSkillDetail extends ClientSkillSummary {
@@ -45,16 +28,14 @@ export interface ClientSkillDetail extends ClientSkillSummary {
     body: string;
     resources: string[];
 }
-/** 创建 skill 的入参（scope/target 决定落盘位置）。 */
+/** 创建 skill 的入参。 */
 export interface CreateSkillInput {
-    scope: WritableScope;
-    target?: ".dsh" | ".agents";
     format: SkillFormat;
     spec: SkillSpec;
     body: string;
     overwrite?: boolean;
 }
-/** 操作结果：成功或错误信息列表（与宿主侧枚举保持同构）。 */
+/** 操作结果：成功或错误信息列表。 */
 export type OpResult = {
     ok: true;
 } | {
@@ -70,29 +51,23 @@ export type InstallResult = {
     ok: false;
     errors: string[];
 };
-/** 上传/下载通道里的一个文件：相对路径 + base64 内容（二进制安全）。 */
+/** 上传/下载通道里的一个文件：相对路径 + base64 内容。 */
 export interface SkillFilePayload {
     path: string;
     content: string;
 }
 /** 浏览器上传安装的入参（单 .md 文件或含 SKILL.md 的一组目录文件）。 */
 export interface InstallUploadInput {
-    scope: WritableScope;
-    target?: ".dsh" | ".agents";
     files: SkillFilePayload[];
     overwrite?: boolean;
 }
 /** 宿主路径安装的入参。 */
 export interface InstallPathInput {
-    scope: WritableScope;
-    target?: ".dsh" | ".agents";
     sourcePath: string;
     overwrite?: boolean;
 }
 /** URL 下载安装的入参（GitHub 仓库 / .zip / raw .md）。 */
 export interface InstallUrlInput {
-    scope: WritableScope;
-    target?: ".dsh" | ".agents";
     url: string;
     overwrite?: boolean;
 }
@@ -106,83 +81,44 @@ export type ExportFilesResult = {
     ok: false;
     errors: string[];
 };
-/** 按行寻址一个可写 skill 的最小入参（root 优先，scope/target 兜底）。 */
+/** 按名称寻址一个 skill。 */
 export interface SkillRef {
     name: string;
-    root?: string;
-    scope?: WritableScope;
-    target?: ".dsh" | ".agents";
 }
 /** skills 域的面板 API。 */
 export interface SkillsApi {
-    /** 列出（合并）当前作用域下所有 skill 摘要。 */
+    /** 列出当前工作区项目级 skill 摘要。 */
     list(): Promise<ClientSkillSummary[]>;
     /** 读取单个 skill 详情；不存在返回 undefined。 */
     read(name: string): Promise<ClientSkillDetail | undefined>;
     create(input: CreateSkillInput): Promise<OpResult>;
     update(input: {
-        scope: WritableScope;
-        target?: ".dsh" | ".agents";
         name: string;
         spec: SkillSpec;
         body: string;
     }): Promise<OpResult>;
     remove(input: SkillRef): Promise<OpResult>;
     /**
-     * 一键启用/禁用 skill：禁用 = 用户与模型都不可调用（frontmatter 写入
-     * `user-invocable: false` 与 `disable-model-invocation: true`）；启用 =
-     * 清除两个键恢复缺省双启用。正文与其它元数据原样保留。
+     * 一键启用/禁用 skill：禁用 = 用户与模型都不可调用；启用 = 清除两个键
+     * 恢复缺省双启用。正文与其它元数据原样保留。
      */
     setEnabled(input: SkillRef & {
         enabled: boolean;
     }): Promise<OpResult>;
     /**
-     * 细粒度调节调用方式：模型（agent 自动触发）与用户（输入框 `/name` 口令）
-     * 两个方向分别启用/禁用。例如只希望用户手动触发、不让 agent 自动注入的
-     * skill，把 `modelInvocable` 设为 false 即可——frontmatter 只写
-     * `disable-model-invocation: true`，另一个方向原样保留。
+     * 细粒度调节调用方式：模型（agent 自动触发）与用户（输入框 `/name`
+     * 口令）两个方向分别启用/禁用。
      */
     setInvocation(input: SkillRef & {
         modelInvocable: boolean;
         userInvocable: boolean;
     }): Promise<OpResult>;
-    /** 浏览器上传安装（单 .md / 含 SKILL.md 的目录文件清单 / zip 解压清单）。 */
+    /** 浏览器上传安装。 */
     installUpload(input: InstallUploadInput): Promise<InstallResult>;
-    /** 从宿主磁盘路径安装（skill 目录或 .md 文件）。 */
+    /** 从宿主磁盘路径安装。 */
     installFromPath(input: InstallPathInput): Promise<InstallResult>;
-    /** 从 URL 下载安装（GitHub 仓库、.zip URL 或 raw .md URL）。 */
+    /** 从 URL 下载安装。 */
     installFromUrl(input: InstallUrlInput): Promise<InstallResult>;
-    /**
-     * 导入单个全局 skill 到当前项目：**物理复制**到 `<项目>/.agents/skills`
-     * （目录型连资源文件），此后在本项目内独立启停/调节调用方向（写项目
-     * 副本的 frontmatter，全局配置不动；快照语义，不跟随全局更新）。
-     * 目标已有同名条目且未传 overwrite 时返回 `{ ok: false, existed: true }`；
-     * 其它项目根有同名原生条目时报硬错误（副本会被遮蔽、不生效）。
-     */
-    importToProject(input: {
-        name: string;
-        fromRoot?: string;
-        overwrite?: boolean;
-    }): Promise<OpResult & {
-        existed?: boolean;
-        path?: string;
-    }>;
-    /**
-     * 在本项目内禁用某个全局 skill（shadow stub）：在项目 `.agents/skills`
-     * 生成同名占位文件（frontmatter 双向禁用），按宿主 rank 覆盖全局条目，
-     * 模型与用户调用都被宿主原生拒绝。项目内已有同名真实条目时返回
-     * `{ ok: false, existed: true }`（应直接禁用那个条目）。
-     */
-    disableInProject(input: {
-        name: string;
-        fromRoot?: string;
-    }): Promise<OpResult & {
-        existed?: boolean;
-    }>;
-    /** 恢复全局 skill 在本项目可用：删除 shadow stub（幂等）。 */
-    enableInProject(input: {
-        name: string;
-    }): Promise<OpResult>;
     /** 导出为 base64 文件清单（供浏览器下载/打包）。 */
     exportFiles(input: SkillRef): Promise<ExportFilesResult>;
     /** 导出到宿主上的指定目录。 */
@@ -191,36 +127,17 @@ export interface SkillsApi {
         overwrite?: boolean;
     }): Promise<OpResult>;
 }
-/** 面板视角的一条 MCP server（合并 + 投影后的视图，自带摘要）。 */
+/** 面板视角的一条 MCP server。 */
 export interface ClientMcpServer {
     key: string;
     serverName: string;
     transport: "stdio" | "http";
-    scope: McpScope;
     enabled: boolean;
-    shadowed: boolean;
     summary: string;
     entry: McpServerEntry;
     filePath: string;
-    /**
-     * 为 true 表示这条**项目**条目与全局条目同源：引用视图（reference）
-     * 恒带此标记；旧版「导入 = 物理复制」时期导入的副本（条目里带导入
-     * 标记）也带此标记。面板据此显示「全局」归属徽标与「移出」按钮。
-     */
-    importedFromGlobal?: boolean;
-    /**
-     * 为 true 表示这条视图是**项目级引用**（内容实时取自同名全局条目，
-     * 启停是引用上的项目级标记）。引用条目不提供「编辑」（请到全局区编辑）。
-     */
-    reference?: boolean;
-    /**
-     * 为 true 表示这个**全局** server 被当前项目在项目级声明为禁用：
-     * 本项目的 session 不会挂载它。面板已改为「项目 / 全局」两区 + 导入制，
-     * 不再展示该标记；输入框快捷弹层（composer-mcp）仍用它过滤与切换。
-     */
-    disabledInProject?: boolean;
 }
-/** 合并列表结果：servers + 非致命的读取错误。 */
+/** 列表结果：servers + 非致命的读取错误。 */
 export interface ClientMcpList {
     servers: ClientMcpServer[];
     errors: string[];
@@ -232,7 +149,7 @@ export interface ClientMcpMount {
     state: "mounted" | "failed" | "conflict";
     error?: string;
 }
-/** 一个 session 的挂载状态视图（对应宿主的 McpStatusView）。 */
+/** 一个 session 的挂载状态视图。 */
 export interface ClientMcpStatus {
     sessionId: string;
     projectRoot?: string;
@@ -240,7 +157,6 @@ export interface ClientMcpStatus {
 }
 /** 新增/更新一条 server 的入参。 */
 export interface McpUpsertInput {
-    scope: McpScope;
     key: string;
     entry: McpServerEntry;
 }
@@ -249,145 +165,31 @@ export interface McpApi {
     list(): Promise<ClientMcpList>;
     upsert(input: McpUpsertInput): Promise<OpResult>;
     remove(input: {
-        scope: McpScope;
         key: string;
     }): Promise<OpResult>;
     setEnabled(input: {
-        scope: McpScope;
         key: string;
         enabled: boolean;
     }): Promise<OpResult>;
-    /**
-     * 导入全局 server 到当前项目：**登记一条引用**（写入
-     * `<项目根>/.agents/capability-imports.json`），不是物理复制——内容始终
-     * 跟随全局条目，全局更新实时生效；项目级启停记录在引用上。引用与项目
-     * 原生条目同级参与挂载合并（遮蔽全局原版）。项目内已有同名原生条目时
-     * 报硬错误；已有同名引用且未传 overwrite 时返回 `{ ok: false, existed: true }`。
-     */
-    importToProject(input: {
-        key: string;
-        overwrite?: boolean;
-    }): Promise<OpResult & {
-        existed?: boolean;
-    }>;
     /** 当前项目下各 session 的实时挂载状态。 */
     status(): Promise<ClientMcpStatus[]>;
 }
-/** 面板视角下的一条快捷消息（跨作用域合并后的视图）。 */
-export interface ClientQuickMessage {
-    /** 消息名称（文件里的键名）。 */
-    name: string;
-    scope: "project" | "global";
-    /** 是否启用（disabled 缺省为启用）。 */
-    enabled: boolean;
-    /** 消息正文（插入草稿时原样追加）。 */
-    text: string;
-    /** 声明这条消息的文件绝对路径。 */
-    filePath: string;
-    /**
-     * 为 true 表示这条**项目**消息与全局条目同源：引用视图（reference）
-     * 恒带此标记；旧版「导入 = 物理复制」时期导入的副本（条目里带导入
-     * 标记）也带此标记。面板据此显示「全局」归属徽标与「移出」按钮。
-     */
-    importedFromGlobal?: boolean;
-    /**
-     * 为 true 表示这条视图是**项目级引用**（内容实时取自同名全局条目，
-     * 启停是引用上的项目级标记）。引用条目不提供「编辑」（请到全局区编辑）。
-     */
-    reference?: boolean;
-    /**
-     * 为 true 表示这条**全局**消息被本项目内的同名条目（原生或引用）遮蔽：
-     * 输入框快捷弹层据此过滤全局原版。
-     */
-    shadowed?: boolean;
-    /**
-     * 为 true 表示这个**全局**快捷消息被当前项目在项目级声明为禁用。
-     * 面板已改为「项目 / 全局」两区 + 导入制，不再展示该标记；输入框
-     * 快捷弹层（composer-quick）仍用它过滤。
-     */
-    disabledInProject?: boolean;
-}
-/** 合并列表结果：messages + 非致命的读取错误。 */
-export interface ClientQuickMessagesList {
-    messages: ClientQuickMessage[];
-    errors: string[];
-}
-/** 快捷消息域的面板 API。 */
-export interface QuickMessagesApi {
-    list(): Promise<ClientQuickMessagesList>;
-    upsert(input: {
-        scope: "project" | "global";
-        name: string;
-        text: string;
-    }): Promise<OpResult>;
-    remove(input: {
-        scope: "project" | "global";
-        name: string;
-    }): Promise<OpResult>;
-    setEnabled(input: {
-        scope: "project" | "global";
-        name: string;
-        enabled: boolean;
-    }): Promise<OpResult>;
-    /**
-     * 导入全局快捷消息到当前项目：**登记一条引用**（写入
-     * `<项目根>/.agents/capability-imports.json`），不是物理复制——内容始终
-     * 跟随全局条目，全局更新实时生效；项目级启停记录在引用上。
-     * 项目内已有同名原生条目时报硬错误；已有同名引用且未传 overwrite 时
-     * 返回 `{ ok: false, existed: true }`。
-     */
-    importToProject(input: {
-        name: string;
-        overwrite?: boolean;
-    }): Promise<OpResult & {
-        existed?: boolean;
-    }>;
-}
-/** 面板视角的完整禁用状态（各域的禁用清单 + 声明文件路径；skills 不走此机制）。 */
-export interface ClientOverrides {
-    quickMessages: string[];
-    mcp: string[];
-    /** 声明文件绝对路径（无项目时缺省）。 */
-    filePath?: string;
-}
-/** 项目级禁用域的面板 API。 */
-export interface OverridesApi {
-    /** 当前项目的禁用声明全量（无工作区时返回空清单）。 */
-    get(): Promise<ClientOverrides>;
-    /**
-     * 切换某个**全局**能力在本项目的禁用状态：不在清单里 → 加入（禁用）；
-     * 已在清单里 → 移除（恢复）。落盘 `<项目根>/.agents/capability-overrides.json`，
-     * 读取兼容旧位置 `.dsh` / `.claude`。
-     */
-    toggle(domain: CapabilityDomain, key: string): Promise<OpResult>;
-}
-/** 项目下拉框里的一个工作区选项。 */
+/** 工作区下拉框里的一个选项。 */
 export interface WorkspaceOption {
     id: string;
     path: string;
     title?: string;
 }
-/** 面板需要的全部宿主能力（skills + mcp + 快捷消息 + 项目级禁用 + 工作区选择），传输无关。 */
+/** 面板需要的全部宿主能力，传输无关。 */
 export interface CapabilityPanelApi {
     skills: SkillsApi;
     mcp: McpApi;
-    quickMessages: QuickMessagesApi;
-    overrides: OverridesApi;
-    /** 面板头部的"项目作用域"目录标签。 */
+    /** 当前面板定位到的工作区目录（默认当前工作区；无工作区时为占位文案）。 */
     workspaceLabel(): string;
-    /**
-     * 当前显式钉选的项目目录；`undefined` 表示面板自动跟随
-     * 当前 session / 最近工作区。
-     */
-    selectedProject(): string | undefined;
-    /** 把项目作用域钉选到一个工作区路径（`undefined` 恢复自动跟随）。 */
-    selectProject(path: string | undefined): void;
-    /** 项目下拉框可用的工作区列表。 */
+    /** 工作区下拉框可用的列表。 */
     projects(): WorkspaceOption[];
-    /**
-     * 订阅当前工作区变化，供面板刷新头部标签并重拉项目作用域条目
-     * （解析完成或切换时触发）。
-     * @returns 取消订阅函数。
-     */
+    /** 把面板切换到指定工作区（下拉框选择）。 */
+    selectProject(path: string): void;
+    /** 订阅当前工作区 / 工作区列表变化（切换会话、解析完成或手动选择时触发）。 */
     subscribeWorkspace(listener: () => void): () => void;
 }

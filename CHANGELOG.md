@@ -5,6 +5,29 @@
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-11-13
+
+### 破坏性变更
+
+- **移除快捷消息域**：面板 Tab、输入框弹层、`.agents/quick-messages.json`
+  读写与全部 `quick.*` RPC endpoint 删除。
+- **移除全局作用域**：skills 只管理 `<项目根>/.agents/skills`，MCP 只管理
+  `<项目根>/.mcp.json`；不再读取 `~/.agents` / `~/.dsh` / `~/.claude`。
+- **移除 `.dsh` / `.claude` 兼容目录**：配置读写与项目根标记统一为
+  `.agents`（项目根标记为 `.git` / `.agents` / `dsh.json`）。
+- **移除项目控制全局的叠加机制**：overrides（项目禁用全局）、imports
+  （项目引用全局）、shadow stub（屏蔽占位）、`importToProject` 及其
+  RPC endpoint 全部删除。
+- **移除输入框「能力工具组」**：快捷消息 / Skills / MCP 三个按钮与对应
+  弹层不再注册。
+- **工作区下拉框**：移除"跟随当前会话"选项；下拉框只列已注册工作区，
+  默认定位到当前会话的工作区。
+
+### 变更
+
+- 版本升至 2.0.0；移除 `@deepseek-ai/dsh-home-paths` 依赖。
+- 新增 devDependency `unrun`（`tsdown` 加载 TS 配置所需）。
+
 ## [1.1.0] - 2026-09-29
 
 ### 修复

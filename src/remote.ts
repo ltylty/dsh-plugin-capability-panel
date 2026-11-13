@@ -1,18 +1,12 @@
 /**
  * 宿主端 ⇄ 客户端传输接线：走连接服务的泛型 RPC 通道。
  *
- * 背景：插件不能访问 `/api` 单次路由表（`dsh-host-apiproxy` 里的
- * `UNARY_ROUTES` 对插件关闭），所以要给 GUI 提供可写 API，只能走插件自有的
- * 泛型 RPC 通道：
- *
- *   - 宿主端：  在 `webServer` 上挂 `/capability-panel` 前缀路由（见
- *     {@link mountRpcChannel}；等价于连接服务给 `/api` 挂路由的方式）
- *   - 客户端：  ctx.get("connection").rpc.call("/capability-panel", endpoint, payload, signal)
+ *   - 宿主端：在 `webServer` 上挂 `/capability-panel` 前缀路由；
+ *   - 客户端：`ctx.get("connection").rpc.call("/capability-panel", endpoint, payload, signal)`。
  *
  * handler 签名是 `(endpoint, payload, signal) -> value`。endpoint 按域前缀
- * 命名：`skills.*` 路由到 skills 管理器，`mcp.*` 路由到 MCP 管理器。
- * 所有返回值统一包一层 {@link RpcResult} 信封，错误信息收敛进 `errors` 数组，
- * 客户端据此展示而不抛原始异常。
+ * 命名：`skills.*` / `mcp.*`，二者都只作用于当前工作区的项目级配置。
+ * 所有返回值统一包一层 {@link RpcResult} 信封。
  *
  * @module @chengdb/capability-panel/remote
  */
@@ -24,21 +18,18 @@ export { CHANNEL };
 /**
  * RPC 通道的业务信封。
  *
- * 注意：传输层**恒为 `{ ok: true }`**。连接通道（dsh-client-connection）对
- * 每个服务器响应做 zod 校验，`result` 必须是
- * `{ ok: true, value } | { ok: false, error: RpcError }` 二选一，其中
- * RpcError 是带特定业务 code（bad-request / session-not-found / …）的
- * 判别联合——插件的通用失败（未知 endpoint、handler 抛错、业务失败）
- * 不属于这些 code，直接返回 `{ ok: false, errors }` 会被客户端当成非法
- * 响应抛 zod invalid_union。因此失败一律包成**业务信封**：
- * `{ ok: true, value: { ok: false, errors: [...] } }`（value 是
- * unknown，恒能过通道校验），由客户端适配器（api-adapter）归一成
- * 与旧信封同构的 RawResult，业务 ok 以 value 里的为准。
+ * 传输层**恒为 `{ ok: true }`**：连接通道对每个服务器响应做 zod 校验，
+ * 插件的通用失败不属于宿主 RpcError 的判别联合，因此失败一律包成业务
+ * 信封 `{ ok: true, value: { ok: false, errors } }`，由客户端适配器
+ * （api-adapter）归一。
  */
 export type RpcResult = { ok: true; value: unknown };
 
-/** 业务失败信封（挂在 RpcResult.value 上，与客户端 RawResult 同构）。 */
-export type BusinessFailure = { ok: false; errors: string[] };
+/** 业务失败信封（挂在 RpcResult.value 上）。 */
+export interface BusinessFailure {
+  ok: false;
+  errors: string[];
+}
 
 /** 构造一个始终通过通道校验的业务失败响应。 */
 function failure(errors: readonly string[]): RpcResult {
@@ -56,9 +47,6 @@ export interface PanelRpcService {
     setEnabled(input: unknown): Promise<unknown>;
     setInvocation(input: unknown): Promise<unknown>;
     install(input: unknown): Promise<unknown>;
-    importToProject(input: unknown): Promise<unknown>;
-    disableInProject(input: unknown): Promise<unknown>;
-    enableInProject(input: unknown): Promise<unknown>;
     export(input: unknown): Promise<unknown>;
   };
   mcp: {
@@ -66,30 +54,20 @@ export interface PanelRpcService {
     upsert(input: unknown): Promise<unknown>;
     remove(input: unknown): Promise<unknown>;
     setEnabled(input: unknown): Promise<unknown>;
-    importToProject(input: unknown): Promise<unknown>;
     status(cwd?: string): unknown;
-  };
-  quickMessages: {
-    list(cwd?: string): Promise<unknown>;
-    upsert(input: unknown): Promise<unknown>;
-    remove(input: unknown): Promise<unknown>;
-    setEnabled(input: unknown): Promise<unknown>;
-    importToProject(input: unknown): Promise<unknown>;
-  };
-  overrides: {
-    get(cwd?: string): Promise<unknown>;
-    toggle(input: unknown): Promise<unknown>;
   };
 }
 
 /**
  * 把 `(endpoint, payload)` 路由到服务并规范化结果。
- *
- * 从 payload 里解析可选的 `cwd`（skills.list / mcp.list / mcp.status 用它
- * 限定项目作用域）；未知 endpoint 或服务抛错都归一成业务失败信封
- * `{ ok: true, value: { ok: false, errors } }`（见 {@link failure}）。
+ * 从 payload 里解析可选的 `cwd`（限定项目作用域）。
  */
-export async function handleEndpoint(service: PanelRpcService, endpoint: string, payload: unknown, _signal?: AbortSignal): Promise<RpcResult> {
+export async function handleEndpoint(
+  service: PanelRpcService,
+  endpoint: string,
+  payload: unknown,
+  _signal?: AbortSignal,
+): Promise<RpcResult> {
   const p = (payload ?? {}) as Record<string, unknown>;
   const cwd = typeof p.cwd === "string" ? p.cwd : undefined;
   try {
@@ -110,12 +88,6 @@ export async function handleEndpoint(service: PanelRpcService, endpoint: string,
         return { ok: true, value: await service.skills.setInvocation(p) };
       case "skills.install":
         return { ok: true, value: await service.skills.install(p) };
-      case "skills.importToProject":
-        return { ok: true, value: await service.skills.importToProject(p) };
-      case "skills.disableInProject":
-        return { ok: true, value: await service.skills.disableInProject(p) };
-      case "skills.enableInProject":
-        return { ok: true, value: await service.skills.enableInProject(p) };
       case "skills.export":
         return { ok: true, value: await service.skills.export(p) };
       case "mcp.list":
@@ -126,24 +98,8 @@ export async function handleEndpoint(service: PanelRpcService, endpoint: string,
         return { ok: true, value: await service.mcp.remove(p) };
       case "mcp.setEnabled":
         return { ok: true, value: await service.mcp.setEnabled(p) };
-      case "mcp.importToProject":
-        return { ok: true, value: await service.mcp.importToProject(p) };
       case "mcp.status":
         return { ok: true, value: service.mcp.status(cwd) };
-      case "quick.list":
-        return { ok: true, value: await service.quickMessages.list(cwd) };
-      case "quick.upsert":
-        return { ok: true, value: await service.quickMessages.upsert(p) };
-      case "quick.remove":
-        return { ok: true, value: await service.quickMessages.remove(p) };
-      case "quick.setEnabled":
-        return { ok: true, value: await service.quickMessages.setEnabled(p) };
-      case "quick.importToProject":
-        return { ok: true, value: await service.quickMessages.importToProject(p) };
-      case "overrides.get":
-        return { ok: true, value: await service.overrides.get(cwd) };
-      case "overrides.toggle":
-        return { ok: true, value: await service.overrides.toggle(p) };
       default:
         return failure([`unknown endpoint "${endpoint}"`]);
     }
@@ -155,31 +111,17 @@ export async function handleEndpoint(service: PanelRpcService, endpoint: string,
 /**
  * 挂载插件自有的 HTTP RPC 通道。
  *
- * **为什么不用 `connection.rpc.handle(...)`**：该 API 的契约（
- * dsh-client-connection 的 `HostConnectionRpc.handle`）正是"注册一个绝对通道
- * 前缀 + 返回 disposer"，本插件此前也这么用；但当前宿主（0.1.5-rc.2）的实现
- * 是 `owner.effect(() => owner.webServer.register(route))`，其中 `owner` 经
- * cordis 的 shadow/origin 绑定解析成 **connection 插件自己的 ctx**（不是调用
- * 方的注入 ctx），而那个 ctx 的 inject 里没有 `webServer`，于是**恒定**抛
- * `cannot get property "webServer" without inject`。异常发生在 `rpc.handle`
- * 内部，通道静默不挂载，浏览器端在 `/capability-panel/*` 上只拿到
- * frontend-static 兜底的 405。
+ * 不用 `connection.rpc.handle(...)`（当前宿主实现里它的 owner 解析成
+ * connection 自己的 ctx，缺 `webServer` inject，会恒定抛错），改用三个
+ * 公开 API：
  *
- * 因此这里改用宿主**公开且文档化**的三个 API 自己挂路由，与 connection 插件
- * 挂 `/api`、api-gateway 挂 WebSocket 升波路由完全同构：
+ *   - `ctx.inject(["connection", "webServer"], ...)`：等两端服务就位再挂；
+ *   - `connection.requestRejection(req)`：Host/Origin 信任 + 会话认证；
+ *   - `webServer.register({ kind: "prefix", path: CHANNEL, handler })`：前缀路由。
  *
- *   - `ctx.inject(["connection", "webServer"], ...)`：等两端服务就位再挂，
- *     早于 webServer 出现就挂会拿不到服务；
- *   - `connection.requestRejection(req)`：宿主的 Host/Origin 信任检查 + 浏览器
- *     会话认证（未认证 401 / 不受信来源 403）；
- *   - `webServer.register({ kind: "prefix", path: CHANNEL, handler })`：注册
- *     前缀路由。注册生命周期挂在**本插件的 fiber** 上（`ctx.effect`），插件
- *     卸载 / 重载即摘除，不会留下旧 handler。
- *
- * 线上信封与 `dsh-client-connection` 客户端 `rpc.call` 保持一致（见
- * {@link createChannelRoute}）：请求 `{ type: "client-request", rpcId, method,
- * payload }`，响应 `{ type: "server-response", rpcId, result }`，其中 result 即
- * {@link RpcResult}。
+ * 线上信封与 `dsh-client-connection` 客户端一致：请求
+ * `{ type: "client-request", rpcId, method, payload }`，响应
+ * `{ type: "server-response", rpcId, result }`。
  */
 export function mountRpcChannel(ctx: any, service: PanelRpcService) {
   const handler = (endpoint: string, payload: unknown) => handleEndpoint(service, endpoint, payload);
@@ -205,13 +147,12 @@ export function mountRpcChannel(ctx: any, service: PanelRpcService) {
 
   return () => {
     if (typeof disposeRoute === "function") (disposeRoute as () => void)();
-    // cordis 4 的 `ctx.inject` 返回 Fiber（对象，带 dispose()），旧版返回函数。
     if (typeof stopInject === "function") (stopInject as () => void)();
     else void (stopInject as { dispose?: () => Promise<void> } | undefined)?.dispose?.();
   };
 }
 
-/** 通道请求体的字节上限，与 dsh-client-connection 的默认值（300 MiB）对齐。 */
+/** 通道请求体的字节上限，与 dsh-client-connection 的默认值对齐。 */
 const MAX_REQUEST_BODY_BYTES = 300 * 1024 * 1024;
 
 /** endpoint 单段字符集，与宿主 `endpointFromPath` 的校验保持一致。 */
@@ -228,20 +169,17 @@ function endpointFromPath(pathname: string): string | undefined {
 }
 
 /**
- * 组装通道的 node:http 处理函数：先过信任/认证闸门，再把
- * `{ type: "client-request", rpcId, method, payload }` 解成
- * `handler(endpoint, payload)`，最后以 `{ type: "server-response", rpcId, result }`
- * 回写（HTTP 始终 200，业务失败在 result 里表达，与宿主同款语义）。
+ * 组装通道的 node:http 处理函数：先过信任/认证闸门，再解析
+ * `{ type: "client-request", rpcId, method, payload }`，最后以
+ * `{ type: "server-response", rpcId, result }` 回写。
  */
 function createChannelRoute(connection: any, handler: (endpoint: string, payload: unknown) => Promise<RpcResult>) {
-  /** 写一个 JSON 响应。 */
   const respond = (res: any, body: unknown) => {
     const payload = JSON.stringify(body);
     res.writeHead(200, { "content-type": "application/json", "content-length": Buffer.byteLength(payload) });
     res.end(payload);
   };
 
-  /** 以宿主同款的 bad-request 信封回应非法请求（HTTP 200 + result.ok=false）。 */
   const badRequest = (res: any, rpcId: unknown, message: string) =>
     respond(res, {
       type: "server-response",
@@ -269,7 +207,6 @@ function createChannelRoute(connection: any, handler: (endpoint: string, payload
       return;
     }
 
-    // 逐块读请求体并限长（上传安装走这条通道，base64 zip 可能很大）。
     const declared = req.headers["content-length"];
     if (declared !== undefined && Number(declared) > MAX_REQUEST_BODY_BYTES) {
       res.writeHead(413, { connection: "close" });

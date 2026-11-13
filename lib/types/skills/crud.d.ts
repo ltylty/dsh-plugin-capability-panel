@@ -131,15 +131,3 @@ export interface SkillEntry {
  * 其次 `<name>/SKILL.md` 目录（directory）；同名两者并存时 flat 优先。
  */
 export declare function listSkillEntries(root: string): Promise<SkillEntry[]>;
-/** 克隆操作的结果。 */
-export interface CloneResult {
-    ok: boolean;
-    errors?: string[];
-    path?: string;
-}
-/**
- * 把 skill 从一个根复制到另一个根（可选改名）。
- * directory 布局会把兄弟资源文件一并复制到目标目录。
- * 注意：此函数目前仅作为公开 API 导出（index.ts），面板 UI 尚未调用。
- */
-export declare function cloneSkill(fromRoot: string, toRoot: string, name: string, newName?: string): Promise<CloneResult>;
