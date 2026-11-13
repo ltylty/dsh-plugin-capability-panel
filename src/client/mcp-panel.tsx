@@ -13,8 +13,10 @@ import type { CapabilityPanelApi, ClientMcpServer, McpApi, OpResult } from "./ap
 import { summarizeEntry, transportOf, validateEntry } from "../mcp/entry-util.js";
 import type { McpServerEntry } from "../mcp/types.js";
 import { Modal } from "./modal.js";
+import { SkpSelect } from "./select.js";
 import { hasWorkspaceLabel, useAsyncList } from "./panel-common.js";
 import { aggregateMounts, MOUNT_LABEL, type MountInfo } from "./mcp-common.js";
+import { MCP_PRESETS } from "./mcp-presets.js";
 
 /** 行圆点的 tooltip：以启用/禁用为主语义，挂载状态作为补充说明。 */
 function rowDotTitle(server: ClientMcpServer, mount: MountInfo | undefined): string {
@@ -425,12 +427,12 @@ function McpAddDialog({
   onClose(): void;
   onMutated(): void;
 }) {
-  const [tab, setTab] = useState<"form" | "json">("form");
+  const [tab, setTab] = useState<"preset" | "form" | "json">("preset");
 
   return (
     <Modal title="添加 MCP 服务器" onClose={onClose}>
       <div className="skp-tabs" role="tablist">
-        {(["form", "json"] as const).map((t) => (
+        {(["preset", "form", "json"] as const).map((t) => (
           <button
             key={t}
             role="tab"
@@ -438,9 +440,12 @@ function McpAddDialog({
             className={tab === t ? "skp-tab skp-tab-active" : "skp-tab"}
             onClick={() => setTab(t)}
           >
-            {t === "form" ? "表单" : "JSON"}
+            {t === "preset" ? "预置" : t === "form" ? "表单" : "JSON"}
           </button>
         ))}
+      </div>
+      <div hidden={tab !== "preset"}>
+        <McpPresetImport api={api} onClose={onClose} onMutated={onMutated} />
       </div>
       <div hidden={tab !== "form"}>
         <McpForm
@@ -495,6 +500,97 @@ function McpEditDialog({
         }}
       />
     </Modal>
+  );
+}
+
+/**
+ * 预置 MCP 面板：从下拉框选择一个预置，按需填写认证 Header 后一键添加。
+ */
+function McpPresetImport({ api, onClose, onMutated }: { api: McpApi; onClose(): void; onMutated(): void }) {
+  const [presetId, setPresetId] = useState(MCP_PRESETS[0]?.id ?? "");
+  const [token, setToken] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [errors, setErrors] = useState<string[]>([]);
+
+  const preset = MCP_PRESETS.find((item) => item.id === presetId) ?? MCP_PRESETS[0];
+  if (preset === undefined) return <div className="skp-error">没有可用的预置 MCP。</div>;
+
+  const submit = async () => {
+    setBusy(true);
+    setErrors([]);
+    const entry: McpServerEntry = { ...preset.entry };
+    if (preset.auth !== undefined) {
+      entry.headers = { ...(entry.headers ?? {}), [preset.auth.header]: token.trim() };
+    }
+    const result = await api.upsert({ key: preset.key, entry });
+    if (!result.ok) {
+      setErrors(result.errors);
+      setBusy(false);
+      return;
+    }
+    onMutated();
+    onClose();
+  };
+
+  const canSubmit = !busy && (preset.auth === undefined || token.trim().length > 0);
+
+  return (
+    <div className="skp-form">
+      <label className="skp-field">
+        <span className="skp-field-label">预置 MCP</span>
+        <SkpSelect
+          value={preset.id}
+          ariaLabel="预置 MCP"
+          options={MCP_PRESETS.map((item) => ({ value: item.id, label: item.name, hint: item.summary }))}
+          onChange={setPresetId}
+        />
+      </label>
+
+      <div className="skp-field">
+        <span className="skp-field-label">服务地址</span>
+        <span className="skp-note skp-path">{preset.entry.url}</span>
+      </div>
+
+      {preset.auth !== undefined && (
+        <label className="skp-field">
+          <span className="skp-field-label">
+            {preset.auth.label}（Header: {preset.auth.header}）
+          </span>
+          <input
+            className="skp-input"
+            type="password"
+            autoComplete="off"
+            value={token}
+            placeholder={preset.auth.placeholder ?? ""}
+            onChange={(e) => setToken(e.target.value)}
+          />
+        </label>
+      )}
+
+      {preset.references !== undefined && preset.references.length > 0 && (
+        <span className="skp-note">
+          {preset.references.map((reference, index) => (
+            <span key={reference.url}>
+              {index > 0 && " · "}
+              <a href={reference.url} target="_blank" rel="noreferrer">
+                {reference.label}
+              </a>
+            </span>
+          ))}
+        </span>
+      )}
+
+      {errors.length > 0 && <div className="skp-error">{errors.join("\n")}</div>}
+
+      <div className="skp-modal-actions">
+        <button type="button" className="skp-btn" onClick={onClose}>
+          取消
+        </button>
+        <button type="button" className="skp-btn skp-btn-primary" disabled={!canSubmit} onClick={() => void submit()}>
+          {busy ? "添加中…" : "添加"}
+        </button>
+      </div>
+    </div>
   );
 }
 

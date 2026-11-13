@@ -25,6 +25,9 @@
 
 ### 变更
 
+- MCP 添加对话框新增「预置」Tab：首批提供腾讯文档 MCP
+  （`https://docs.qq.com/openapi/mcp`，Header `Authorization: <mcptoken>`），
+  下拉选择后填写 token 即可添加，附授权页与使用指南两个链接。
 - 安装技能的「宿主路径」改为「技能库」：新增 `skillLibrary` 配置
   （回退环境变量 `DSH_SKILL_LIBRARY`），面板从预置目录下拉选择，
   不再接受任意宿主路径。
