@@ -6,16 +6,24 @@
  *   - MCP：当前工作区项目级 `.mcp.json` 的 server 管理，带实时挂载状态
  *     （见 `mcp-panel.tsx`）。
  *
- * 面板始终直接定位到**当前会话的工作区**，不提供项目切换入口。
+ * 工作区在左侧平铺为导航列表（不用下拉），默认高亮当前会话的工作区；
+ * 点击任一行即把面板切换到该工作区，技能 / MCP 两个域共用同一选择。
  *
  * @module dsh-workspace-skill-mcp/client/panel
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CapabilityPanelApi, ClientSkillSummary, SkillFilePayload, SkillLibraryView, SkillRef, SkillsApi } from "./api.js";
+import type {
+  CapabilityPanelApi,
+  ClientSkillSummary,
+  SkillFilePayload,
+  SkillLibraryView,
+  SkillRef,
+  SkillsApi,
+  WorkspaceOption,
+} from "./api.js";
 import { McpView } from "./mcp-panel.js";
 import { Modal } from "./modal.js";
-import { SkpSelect } from "./select.js";
 import { hasWorkspaceLabel, useAsyncList } from "./panel-common.js";
 import { locateSkillRoot, rerootEntries, stripCommonTopFolder } from "../shared/skill-locate.js";
 import { unzip } from "./unzip.js";
@@ -54,10 +62,10 @@ export function CapabilityPanel({ api }: { api: CapabilityPanelApi }) {
   }, [api]);
 
   const workspaceValue = workspace !== undefined && workspace !== "（无工作区）" ? workspace : "";
-  const workspaceOptions = [
-    ...projects.map((p) => ({ value: p.path, label: p.title ?? p.path })),
+  const railItems: WorkspaceOption[] = [
+    ...projects,
     ...(workspaceValue.length > 0 && !projects.some((p) => p.path === workspaceValue)
-      ? [{ value: workspaceValue, label: workspaceValue }]
+      ? [{ id: workspaceValue, path: workspaceValue }]
       : []),
   ];
 
@@ -66,16 +74,6 @@ export function CapabilityPanel({ api }: { api: CapabilityPanelApi }) {
       <header className="skp-header">
         <div className="skp-title-row">
           <div className="skp-title-main">
-            {(workspaceOptions.length > 0 || workspaceValue.length > 0) && (
-              <SkpSelect
-                className="skp-dd-workspace"
-                value={workspaceValue}
-                title={workspaceValue}
-                ariaLabel="工作区"
-                options={workspaceOptions}
-                onChange={(value) => api.selectProject(value)}
-              />
-            )}
             <h2>工作区技能</h2>
           </div>
         </div>
@@ -94,8 +92,58 @@ export function CapabilityPanel({ api }: { api: CapabilityPanelApi }) {
         </div>
       </header>
 
-      {domain === "skills" ? <SkillsView api={api} workspace={workspace} /> : <McpView api={api} workspace={workspace} />}
+      <div className="skp-main">
+        <WorkspaceRail items={railItems} value={workspaceValue} onSelect={(path) => api.selectProject(path)} />
+        <div className="skp-content">
+          {domain === "skills" ? <SkillsView api={api} workspace={workspace} /> : <McpView api={api} workspace={workspace} />}
+        </div>
+      </div>
     </section>
+  );
+}
+
+/**
+ * 左侧工作区导航：把全部工作区平铺成列表（不再使用下拉）。
+ *
+ * 选中态由 `value`（当前生效的工作区路径）决定；点击即切换项目。
+ */
+function WorkspaceRail({
+  items,
+  value,
+  onSelect,
+}: {
+  items: WorkspaceOption[];
+  value: string;
+  onSelect(path: string): void;
+}) {
+  return (
+    <nav className="skp-wsrail" aria-label="工作区">
+      <div className="skp-wsrail-head">
+        <span>工作区</span>
+        <span className="skp-wsrail-count">{items.length}</span>
+      </div>
+      {items.length === 0 ? (
+        <div className="skp-wsrail-empty">（无工作区）</div>
+      ) : (
+        items.map((item) => {
+          const active = item.path === value;
+          const hasTitle = typeof item.title === "string" && item.title.length > 0;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              className={active ? "skp-ws-row skp-ws-row-active" : "skp-ws-row"}
+              aria-current={active ? "true" : undefined}
+              title={item.path}
+              onClick={() => onSelect(item.path)}
+            >
+              <span className="skp-ws-name">{item.title ?? item.path}</span>
+              {hasTitle && <span className="skp-ws-path">{item.path}</span>}
+            </button>
+          );
+        })
+      )}
+    </nav>
   );
 }
 
