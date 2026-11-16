@@ -112,7 +112,7 @@ store-only zip；也可以复制到宿主任意目录。
 安装最新 release（推荐，版本钉死）：
 
 ```bash
-dsh plugin --profile web add "github:chengdb/dsh-plugin-capability-panel#v2.0.0"
+dsh plugin --profile web add github:ltylty/dsh-workspace-skill-mcp
 dsh web        # 打开 Web GUI，侧栏底部可见「工作区技能」
 ```
 
