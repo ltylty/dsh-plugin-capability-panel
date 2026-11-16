@@ -4,7 +4,7 @@
  * 只管理项目级配置：`<项目根>/.mcp.json`（与 Claude Code 的约定兼容）。
  * 项目根的探测复用 shared/project-root.ts。
  *
- * @module @chengdb/capability-panel/mcp/paths
+ * @module dsh-workspace-skill-mcp/mcp/paths
  */
 
 import { join } from "node:path";

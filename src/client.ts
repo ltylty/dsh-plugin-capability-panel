@@ -1,5 +1,5 @@
 /**
- * capability-panel 的客户端插件入口。
+ * dsh-workspace-skill-mcp 的客户端插件入口。
  *
  * 发布后的 bundle 会把本模块包裹进
  * `window.__ModuleLoader__.load({ id, factory })`（由 tsdown 生成，平台模块
@@ -10,7 +10,7 @@
  * 面板默认定位到**当前会话的工作区**，右上角下拉框可切换到其它已注册
  * 工作区（不提供"跟随当前会话"选项）。
  *
- * @module @chengdb/capability-panel/client
+ * @module dsh-workspace-skill-mcp/client
  */
 
 import { createElement } from "react";
@@ -116,7 +116,7 @@ export function apply(ctx: any) {
 
   ctx.effect?.(() => () => {
     for (const dispose of disposers) dispose();
-  }, "capability-panel: client");
+  }, "dsh-workspace-skill-mcp: client");
 }
 
 /**

@@ -5,7 +5,7 @@
  *   - `useAsyncList`：两域视图高度同构的"依赖变化时拉取 + 显式重拉"状态机
  *     （loading/error/请求序号守卫）。
  *
- * @module @chengdb/capability-panel/client/panel-common
+ * @module dsh-workspace-skill-mcp/client/panel-common
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";

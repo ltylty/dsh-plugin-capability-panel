@@ -1,5 +1,5 @@
 /**
- * capability-panel 插件的宿主端入口。
+ * dsh-workspace-skill-mcp 插件的宿主端入口。
  *
  * 职责：
  *
@@ -13,7 +13,7 @@
  * 本插件**不会**重复注册 skills provider：文件系统 provider 已经拥有
  * 项目 skill 目录，所以技能读取复用直接磁盘列举，而不是注册第二个 provider。
  *
- * @module @chengdb/capability-panel
+ * @module dsh-workspace-skill-mcp
  */
 
 import type {} from "@deepseek-ai/cordis";
@@ -25,7 +25,7 @@ import { createMcpManager } from "./mcp/manager.js";
 import { mountRpcChannel } from "./remote.js";
 
 /** Cordis 插件名（对应 cordis.patch.yml 里的插件 id）。 */
-export const name = "capability-panel";
+export const name = "dsh-workspace-skill-mcp";
 
 /** 宿主插件强依赖的服务（connection/webServer 是惰性解析的，不在这里声明）。 */
 export const inject = ["skills"];
@@ -77,7 +77,7 @@ export function apply(ctx: any, config: Config = {}) {
   if (disposers.length > 0) {
     ctx.effect(() => () => {
       for (const dispose of disposers) dispose();
-    }, "capability-panel: rpc channel");
+    }, "dsh-workspace-skill-mcp: rpc channel");
   }
 }
 

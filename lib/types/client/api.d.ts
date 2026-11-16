@@ -7,7 +7,7 @@
  *
  * 客户端类型（`Client*` 前缀）刻意与宿主类型保持独立：这是传输边界。
  *
- * @module @chengdb/capability-panel/client/api
+ * @module dsh-workspace-skill-mcp/client/api
  */
 import type { SkillFormat, SkillSpec } from "../skills/types.js";
 import type { McpServerEntry } from "../mcp/types.js";

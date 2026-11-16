@@ -25,6 +25,8 @@
 
 ### 变更
 
+- 插件包名与 Cordis 插件 id 由 `@chengdb/capability-panel` / `capability-panel`
+  改为 `dsh-workspace-skill-mcp`。
 - MCP 添加对话框新增「预置」Tab：首批提供腾讯文档 MCP
   （`https://docs.qq.com/openapi/mcp`，Header `Authorization: <mcptoken>`），
   下拉选择后填写 token 即可添加，附授权页与使用指南两个链接。

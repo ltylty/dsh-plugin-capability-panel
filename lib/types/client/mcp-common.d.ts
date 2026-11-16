@@ -5,7 +5,7 @@
  *   - 把多个 session 的挂载状态按 server.key 聚合、取"最差"状态的循环
  *     （conflict > failed > mounted）。
  *
- * @module @chengdb/capability-panel/client/mcp-common
+ * @module dsh-workspace-skill-mcp/client/mcp-common
  */
 import type { ClientMcpStatus } from "./api.js";
 /** 面板内聚的挂载状态（脱去 session 维度，按 key 聚合最差状态）。 */

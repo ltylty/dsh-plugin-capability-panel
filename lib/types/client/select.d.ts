@@ -9,7 +9,7 @@
  *
  * 关闭时机：点击组件外部（capture 阶段判定）、Esc、窗口滚动 / resize。
  *
- * @module @chengdb/capability-panel/client/select
+ * @module dsh-workspace-skill-mcp/client/select
  */
 /** 下拉选项：value 为提交值，label 为展示文案，hint 为右侧弱化补充。 */
 export interface SkpSelectOption {

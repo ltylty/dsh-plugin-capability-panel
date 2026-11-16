@@ -4,7 +4,7 @@
  * 目录布局与文件系统 provider（`dsh-skill-filesystem`）扫描的布局严格对齐：
  * 项目级 skill 固定在 `<项目根>/.agents/skills`。
  *
- * @module @chengdb/capability-panel/skills/roots
+ * @module dsh-workspace-skill-mcp/skills/roots
  */
 
 import { join } from "node:path";

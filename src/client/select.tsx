@@ -9,7 +9,7 @@
  *
  * 关闭时机：点击组件外部（capture 阶段判定）、Esc、窗口滚动 / resize。
  *
- * @module @chengdb/capability-panel/client/select
+ * @module dsh-workspace-skill-mcp/client/select
  */
 
 import { useEffect, useRef, useState } from "react";

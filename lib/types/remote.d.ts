@@ -8,7 +8,7 @@
  * 命名：`skills.*` / `mcp.*`，二者都只作用于当前工作区的项目级配置。
  * 所有返回值统一包一层 {@link RpcResult} 信封。
  *
- * @module @chengdb/capability-panel/remote
+ * @module dsh-workspace-skill-mcp/remote
  */
 import { CHANNEL } from "./channel.js";
 export { CHANNEL };

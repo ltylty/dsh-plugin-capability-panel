@@ -9,7 +9,7 @@
  * `skill` 工具 / `/name` 注入三条链路都原生读这两个键（文件 watcher 使改动
  * 下一步即生效），本插件不维护任何平行的禁用状态。
  *
- * @module @chengdb/capability-panel/skills/manager
+ * @module dsh-workspace-skill-mcp/skills/manager
  */
 
 import { projectSkillsDir } from "./roots.js";

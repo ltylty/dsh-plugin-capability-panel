@@ -8,7 +8,7 @@
  *
  * 面板始终直接定位到**当前会话的工作区**，不提供项目切换入口。
  *
- * @module @chengdb/capability-panel/client/panel
+ * @module dsh-workspace-skill-mcp/client/panel
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";

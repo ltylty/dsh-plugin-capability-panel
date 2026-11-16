@@ -7,7 +7,7 @@
  *
  * 目录来源：插件配置 `skillLibrary`，回退环境变量 `DSH_SKILL_LIBRARY`。
  *
- * @module @chengdb/capability-panel/skills/library
+ * @module dsh-workspace-skill-mcp/skills/library
  */
 
 import { readdir, readFile, stat } from "node:fs/promises";

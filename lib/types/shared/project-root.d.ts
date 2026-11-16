@@ -5,7 +5,7 @@
  * `.agents/skills`，MCP 在 `.mcp.json`。向上查找"项目根"是定位这两个
  * 路径的前提，因此把这段逻辑收拢在这里。
  *
- * @module @chengdb/capability-panel/shared/project-root
+ * @module dsh-workspace-skill-mcp/shared/project-root
  */
 /**
  * 从 `cwd` 向上逐级查找项目根。

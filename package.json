@@ -1,5 +1,5 @@
 {
-  "name": "@chengdb/capability-panel",
+  "name": "dsh-workspace-skill-mcp",
   "description": "dsh plugin: browse and manage project-level skills and MCP servers from the web GUI",
   "version": "2.0.0",
   "type": "module",

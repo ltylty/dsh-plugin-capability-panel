@@ -14,7 +14,7 @@
  * 面板的写操作调用 {@link McpLoader.reload}，dispose 掉受影响 session 的
  * 旧挂载并重新挂载。
  *
- * @module @chengdb/capability-panel/mcp/loader
+ * @module dsh-workspace-skill-mcp/mcp/loader
  */
 import type { McpStatusView } from "./types.js";
 /** 挂载器的构造依赖。 */

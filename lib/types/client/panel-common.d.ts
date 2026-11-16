@@ -5,7 +5,7 @@
  *   - `useAsyncList`：两域视图高度同构的"依赖变化时拉取 + 显式重拉"状态机
  *     （loading/error/请求序号守卫）。
  *
- * @module @chengdb/capability-panel/client/panel-common
+ * @module dsh-workspace-skill-mcp/client/panel-common
  */
 /** 面板是否附着在一个可写工作区上（workspaceLabel 无工作区时返回占位字符串）。 */
 export declare function hasWorkspaceLabel(workspace: string | undefined): boolean;

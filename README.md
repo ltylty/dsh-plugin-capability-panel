@@ -1,4 +1,4 @@
-# @chengdb/capability-panel
+# dsh-workspace-skill-mcp
 
 一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）插件：
 在 Web GUI 里**可视化管理当前项目的全部能力**——Skills 与 MCP 服务器，
@@ -31,7 +31,7 @@
 
 ```yaml
 # ~/.dsh/profiles/web/cordis.patch.yml
-- id: capability-panel
+- id: dsh-workspace-skill-mcp
   config:
     skillLibrary: /data/skills
 ```
@@ -128,7 +128,7 @@ dsh web
 ## 卸载
 
 ```bash
-dsh plugin --profile web remove @chengdb/capability-panel
+dsh plugin --profile web remove dsh-workspace-skill-mcp
 ```
 
 移除后重新运行 `dsh web` 即可。卸载**不会**触碰你已经管理的任何数据——

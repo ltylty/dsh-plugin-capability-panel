@@ -4,7 +4,7 @@
  * 每个预置给出一条可直接写入 `.mcp.json` 的条目，并可声明一个需要用户
  * 手动填写的认证 Header（如腾讯文档的 mcptoken）。
  *
- * @module @chengdb/capability-panel/client/mcp-presets
+ * @module dsh-workspace-skill-mcp/client/mcp-presets
  */
 import type { McpServerEntry } from "../mcp/types.js";
 /** 预置条目需要用户填写的认证信息。 */

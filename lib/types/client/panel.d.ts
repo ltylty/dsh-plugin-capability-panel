@@ -8,7 +8,7 @@
  *
  * 面板始终直接定位到**当前会话的工作区**，不提供项目切换入口。
  *
- * @module @chengdb/capability-panel/client/panel
+ * @module dsh-workspace-skill-mcp/client/panel
  */
 import type { CapabilityPanelApi } from "./api.js";
 /** 面板根组件：头部（标题 + 当前工作区 + 关闭按钮 + 域 Tab）+ 当前域视图。 */

@@ -5,7 +5,7 @@
  * 挂载状态，按搜索词过滤。写入直接落配置文件，宿主在每次写操作后重挂受
  * 影响 session 的连接。
  *
- * @module @chengdb/capability-panel/client/mcp-panel
+ * @module dsh-workspace-skill-mcp/client/mcp-panel
  */
 
 import { useMemo, useState } from "react";
