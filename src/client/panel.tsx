@@ -72,11 +72,6 @@ export function CapabilityPanel({ api }: { api: CapabilityPanelApi }) {
   return (
     <section className="skp-panel" aria-label="工作区技能">
       <header className="skp-header">
-        <div className="skp-title-row">
-          <div className="skp-title-main">
-            <h2>工作区技能</h2>
-          </div>
-        </div>
         <div className="skp-tabs" role="tablist">
           {(["skills", "mcp"] as DomainTab[]).map((d) => (
             <button
