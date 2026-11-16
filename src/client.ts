@@ -5,10 +5,9 @@
  * `window.__ModuleLoader__.load({ id, factory })`（由 tsdown 生成，平台模块
  * 外部化）；这里的源码只导出 `inject` 与 `apply`。
  *
- * 面板入口位于**侧栏底部**：向根作用域的 `sidebar.footer.action` 列表槽
- * 注册一个按钮，摆放在 Settings 旁边；点击后在其上方弹出锚定浮层面板。
- * 面板默认定位到**当前会话的工作区**，右上角下拉框可切换到其它已注册
- * 工作区（不提供"跟随当前会话"选项）。
+ * 面板入口是根作用域的侧栏导航行（`sidebar.panellist`，order 50），点击后
+ * 在主内容区整页打开（`main` keyed slot），不再是弹层。面板默认定位到
+ * 当前会话的工作区，顶部左侧下拉框可切换到其它已注册工作区。
  *
  * @module dsh-workspace-skill-mcp/client
  */
@@ -16,10 +15,13 @@
 import { createElement } from "react";
 import { createPanelApi } from "./client/api-adapter.js";
 import { installStyles } from "./client/styles.js";
-import { CapabilitiesFooterAction } from "./client/panel.js";
+import { WorkspaceSkillsIcon, WorkspaceSkillsPage } from "./client/panel.js";
 
 /** locale 字典的命名空间。 */
 const NS = "capabilityPanel";
+
+/** 主面板 id：同时作为 `sidebar.panellist` 行 id 与 `main` keyed slot 的 key。 */
+const PANEL_ID = "workspace-skills";
 
 /** 简体中文词典（预留脚手架，组件当前硬编码文案）。 */
 const zh = {
@@ -104,14 +106,23 @@ export function apply(ctx: any) {
   if (typeof unsubSessions === "function") disposers.push(unsubSessions);
   if (typeof unsubWorkspaces === "function") disposers.push(unsubWorkspaces);
 
-  // 注册侧栏底部入口（Settings 旁的按钮，点击切换 popover）。
+  // 注册主面板 + 侧栏导航行（order 50，排在「自动化任务」等面板之后）。
+  // 同一 id 同时寻址 sidebar.panellist 行与 main keyed slot 的整页组件。
   if (ctx.slots?.inject && ctx.slots.register) {
-    const dispose = ctx.slots.inject("sidebar.footer.action", () =>
-      ctx.slots.register({ name: "sidebar.footer.action", id: "capability-panel", order: 10, label: "工作区技能" }, (props: { wide?: boolean }) =>
-        CapabilitiesFooterAction({ api, wide: props?.wide !== false }),
+    const disposePanel = ctx.slots.inject("main", () =>
+      ctx.slots.register({ name: "main", key: PANEL_ID, inject: () => ({}) }, () =>
+        WorkspaceSkillsPage({ api }),
       ),
     );
-    if (typeof dispose === "function") disposers.push(dispose);
+    if (typeof disposePanel === "function") disposers.push(disposePanel);
+
+    const disposeNav = ctx.slots.inject("sidebar.panellist", () =>
+      ctx.slots.register(
+        { name: "sidebar.panellist", id: PANEL_ID, order: 50, label: "工作区技能" },
+        (props: { size?: number }) => WorkspaceSkillsIcon({ size: props?.size ?? 16 }),
+      ),
+    );
+    if (typeof disposeNav === "function") disposers.push(disposeNav);
   }
 
   ctx.effect?.(() => () => {

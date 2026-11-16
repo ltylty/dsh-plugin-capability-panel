@@ -31,7 +31,7 @@ const DOMAIN_LABEL: Record<DomainTab, string> = {
 };
 
 /** 面板根组件：头部（标题 + 当前工作区 + 关闭按钮 + 域 Tab）+ 当前域视图。 */
-export function CapabilityPanel({ api, onClose }: { api: CapabilityPanelApi; onClose?: () => void }) {
+export function CapabilityPanel({ api }: { api: CapabilityPanelApi }) {
   const [domain, setDomain] = useState<DomainTab>("skills");
   const [workspace, setWorkspace] = useState<string | undefined>(() => api.workspaceLabel());
   const [projects, setProjects] = useState(() => api.projects());
@@ -78,13 +78,6 @@ export function CapabilityPanel({ api, onClose }: { api: CapabilityPanelApi; onC
             )}
             <h2>工作区技能</h2>
           </div>
-          <div className="skp-title-tools">
-            {onClose !== undefined && (
-              <button className="skp-close" type="button" aria-label="关闭工作区技能" title="关闭面板" onClick={onClose}>
-                ✕
-              </button>
-            )}
-          </div>
         </div>
         <div className="skp-tabs" role="tablist">
           {(["skills", "mcp"] as DomainTab[]).map((d) => (
@@ -107,49 +100,35 @@ export function CapabilityPanel({ api, onClose }: { api: CapabilityPanelApi; onC
 }
 
 /**
- * 侧栏底部入口：Settings 旁的一个按钮，点击切换居中的浮层面板。
+ * 主面板整页：侧栏「工作区技能」导航行选中后渲染在主内容区。
  */
-export function CapabilitiesFooterAction({ api, wide }: { api: CapabilityPanelApi; wide: boolean }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (rootRef.current !== null && event.target instanceof Node && !rootRef.current.contains(event.target)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("pointerdown", onPointerDown, true);
-    return () => document.removeEventListener("pointerdown", onPointerDown, true);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [open]);
-
+export function WorkspaceSkillsPage({ api }: { api: CapabilityPanelApi }) {
   return (
-    <div ref={rootRef} className="skp-foot">
-      {open && (
-        <>
-          <div className="skp-backdrop" onClick={() => setOpen(false)} />
-          <div className="skp-popover">
-            <CapabilityPanel api={api} onClose={() => setOpen(false)} />
-          </div>
-        </>
-      )}
-      <button type="button" className="skp-foot-btn" aria-expanded={open} title="工作区技能" onClick={() => setOpen((value) => !value)}>
-        <span aria-hidden="true" className="skp-foot-icon">
-          ✦
-        </span>
-        {wide && <span className="skp-foot-label">工作区技能</span>}
-      </button>
+    <div className="skp-page">
+      <CapabilityPanel api={api} />
     </div>
+  );
+}
+
+/**
+ * 侧栏导航行图标（由宿主传入尺寸；currentColor 跟随选中/悬停色）。
+ */
+export function WorkspaceSkillsIcon({ size }: { size: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 3.5l1.7 4.8 4.8 1.7-4.8 1.7L12 16.5l-1.7-4.8L5.5 10l4.8-1.7z" />
+      <path d="M18.6 15.6l.7 2.1 2.1.7-2.1.7-.7 2.1-.7-2.1-2.1-.7 2.1-.7z" />
+    </svg>
   );
 }
 
@@ -263,6 +242,7 @@ function SkillsView({ api, workspace }: { api: CapabilityPanelApi; workspace?: s
             setInstallOpen(false);
             reload();
           }}
+          onReload={reload}
         />
       )}
     </div>
@@ -490,11 +470,14 @@ function InstallDialog({
   hasWorkspace,
   onClose,
   onInstalled,
+  onReload,
 }: {
   api: SkillsApi;
   hasWorkspace: boolean;
   onClose: () => void;
   onInstalled: () => void;
+  /** 仅刷新列表、不关闭对话框（批量安装部分成功时使用）。 */
+  onReload: () => void;
 }) {
   const [mode, setMode] = useState<InstallMode>("upload");
   const [overwrite, setOverwrite] = useState(false);
@@ -502,14 +485,14 @@ function InstallDialog({
   const [errors, setErrors] = useState<string[]>([]);
   const [library, setLibrary] = useState<SkillLibraryView | undefined>(undefined);
   const [libraryError, setLibraryError] = useState<string | undefined>(undefined);
-  const [entry, setEntry] = useState("");
+  const [selectedEntries, setSelectedEntries] = useState<string[]>([]);
   const [url, setUrl] = useState("");
   const [picked, setPicked] = useState<{ label: string; files: SkillFilePayload[] } | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const dirInputRef = useRef<HTMLInputElement | null>(null);
   const zipInputRef = useRef<HTMLInputElement | null>(null);
 
-  // 切到「预置」时拉取可安装条目；首次进入自动选中第一条。
+  // 切到「预置」时拉取可安装条目（默认不选中，用户可多选或全选）。
   useEffect(() => {
     if (mode !== "library") return;
     let alive = true;
@@ -519,7 +502,7 @@ function InstallDialog({
       .then((view) => {
         if (!alive) return;
         setLibrary(view);
-        setEntry(view.skills[0]?.entry ?? "");
+        setSelectedEntries([]);
       })
       .catch((error) => {
         if (alive) setLibraryError(String(error));
@@ -599,12 +582,30 @@ function InstallDialog({
     setBusy(true);
     setErrors([]);
     try {
+      if (mode === "library") {
+        if (selectedEntries.length === 0) {
+          setErrors(["请选择至少一个预置技能"]);
+          return;
+        }
+        const failures: string[] = [];
+        let installed = 0;
+        for (const entry of selectedEntries) {
+          const result = await api.installFromLibrary({ entry, overwrite });
+          if (result.ok) installed += 1;
+          else failures.push(entry + "：" + result.errors.join("; "));
+        }
+        if (failures.length > 0) {
+          onReload();
+          setErrors(["已安装 " + installed + " 个，失败 " + failures.length + " 个：", ...failures]);
+          return;
+        }
+        onInstalled();
+        return;
+      }
       const result =
         mode === "upload"
           ? await api.installUpload({ files: picked?.files ?? [], overwrite })
-          : mode === "library"
-            ? await api.installFromLibrary({ entry, overwrite })
-            : await api.installFromUrl({ url: url.trim(), overwrite });
+          : await api.installFromUrl({ url: url.trim(), overwrite });
       if (!result.ok) {
         setErrors(result.errors);
         return;
@@ -617,8 +618,17 @@ function InstallDialog({
     }
   };
 
+  const librarySkills = library?.skills ?? [];
+  const allSelected = librarySkills.length > 0 && selectedEntries.length === librarySkills.length;
+  const someSelected = selectedEntries.length > 0 && !allSelected;
+  const toggleEntry = (entry: string) => {
+    setSelectedEntries((prev) => (prev.includes(entry) ? prev.filter((item) => item !== entry) : [...prev, entry]));
+  };
+
   const canSubmit =
-    !busy && hasWorkspace && (mode === "upload" ? picked !== undefined : mode === "library" ? entry.length > 0 : url.trim().length > 0);
+    !busy &&
+    hasWorkspace &&
+    (mode === "upload" ? picked !== undefined : mode === "library" ? selectedEntries.length > 0 : url.trim().length > 0);
 
   return (
     <Modal title="安装技能" onClose={onClose}>
@@ -677,12 +687,35 @@ function InstallDialog({
             )}
             {library !== undefined && library.skills.length > 0 && (
               <>
-                <SkpSelect
-                  value={entry}
-                  ariaLabel="预置技能条目"
-                  options={library.skills.map((skill) => ({ value: skill.entry, label: skill.name, hint: skill.description }))}
-                  onChange={setEntry}
-                />
+                <label className="skp-pick-all">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    ref={(el) => {
+                      if (el !== null) el.indeterminate = someSelected;
+                    }}
+                    onChange={() => setSelectedEntries(allSelected ? [] : library.skills.map((skill) => skill.entry))}
+                  />
+                  <span>全选（{selectedEntries.length}/{library.skills.length}）</span>
+                </label>
+                <ul className="skp-pick-list">
+                  {library.skills.map((skill) => (
+                    <li key={skill.entry}>
+                      <label className="skp-pick-row">
+                        <input
+                          type="checkbox"
+                          checked={selectedEntries.includes(skill.entry)}
+                          onChange={() => toggleEntry(skill.entry)}
+                        />
+                        <span className="skp-pick-name">{skill.name}</span>
+                        <span className="skp-pick-desc" title={skill.description}>
+                          {skill.description}
+                        </span>
+                        <span className="skp-tag skp-tag-flat">{skill.format === "directory" ? "目录" : "单文件"}</span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
                 <span className="skp-note">目录：{library.dir}</span>
               </>
             )}
@@ -717,7 +750,7 @@ function InstallDialog({
             取消
           </button>
           <button type="button" className="skp-btn skp-btn-primary" disabled={!canSubmit} onClick={doInstall}>
-            {busy ? "安装中…" : "安装"}
+            {busy ? "安装中…" : mode === "library" && selectedEntries.length > 0 ? "安装 " + selectedEntries.length + " 个" : "安装"}
           </button>
         </div>
       </div>

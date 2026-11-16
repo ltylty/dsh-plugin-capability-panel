@@ -27,6 +27,9 @@
 
 - 插件包名与 Cordis 插件 id 由 `@chengdb/capability-panel` / `capability-panel`
   改为 `dsh-workspace-skill-mcp`。
+- 入口由侧栏底部按钮改为侧栏导航行（`sidebar.panellist`，order 50，
+  位于「自动化任务」之后），点击后在主内容区整页打开，不再使用弹层。
+- 安装技能的「预置」支持多选与全选，可一次安装多个 skill。
 - MCP 添加对话框新增「预置」Tab：首批提供腾讯文档 MCP
   （`https://docs.qq.com/openapi/mcp`，Header `Authorization: <mcptoken>`），
   下拉选择后填写 token 即可添加，附授权页与使用指南两个链接。

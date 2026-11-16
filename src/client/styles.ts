@@ -39,16 +39,14 @@ export const SKP_CSS = `
 .skp-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;}
 .skp-title-main{display:flex;align-items:center;gap:12px;min-width:0;}
 .skp-title-main h2{margin:0;font-size:17px;font-weight:600;letter-spacing:.01em;}
-.skp-title-tools{display:flex;align-items:center;gap:10px;flex:none;min-width:0;}
-.skp-close{flex:none;display:grid;place-items:center;width:30px;height:30px;background:none;border:none;border-radius:var(--skp-radius-sm);color:var(--skp-text-3);font-size:13px;line-height:1;cursor:pointer;transition:background-color .15s var(--skp-ease),color .15s var(--skp-ease);}
-.skp-close:hover{background:var(--skp-hover);color:var(--skp-text);}
-.skp-foot{position:relative;}
-.skp-foot-btn{display:flex;align-items:center;gap:8px;width:100%;padding:8px 10px;background:none;border:none;border-radius:var(--skp-radius-sm);font:inherit;font-size:14px;font-weight:500;color:var(--skp-text-2);cursor:pointer;text-align:left;transition:background-color .15s var(--skp-ease),color .15s var(--skp-ease);}
-.skp-foot-btn:hover{background:var(--skp-hover);color:var(--skp-text);}
-.skp-foot-icon{font-size:15px;line-height:1;}
-.skp-foot-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.skp-backdrop{position:fixed;z-index:89;inset:0;background:var(--skp-mask);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);}
-.skp-popover{position:fixed;z-index:90;inset:0;margin:auto;width:74vw;height:84vh;min-width:820px;min-height:560px;border:1px solid var(--skp-border);border-radius:16px;box-shadow:0 24px 64px rgba(15,20,30,.22),0 4px 16px rgba(15,20,30,.1);overflow:hidden;background:var(--skp-surface);}
+.skp-page{height:100%;width:100%;box-sizing:border-box;padding:20px 24px;overflow:auto;background:var(--skp-surface);}
+.skp-page>.skp-panel{max-width:1180px;height:100%;margin:0 auto;}
+@media (max-width:760px){
+.skp-page{padding:12px;}
+.skp-page>.skp-panel{max-width:none;}
+.skp-body{flex-direction:column;}
+.skp-list{width:auto;max-height:38%;border-right:none;border-bottom:1px solid var(--skp-border);}
+}
 .skp-tabs{display:flex;gap:2px;padding:3px;background:var(--skp-fill);border-radius:var(--skp-radius);}
 .skp-tab{flex:1;background:none;border:none;border-radius:var(--skp-radius-sm);padding:7px 16px;font:inherit;font-size:13px;font-weight:500;cursor:pointer;color:var(--skp-text-3);white-space:nowrap;transition:color .15s var(--skp-ease),background-color .15s var(--skp-ease),box-shadow .15s var(--skp-ease);}
 .skp-tab:hover{color:var(--skp-text);}
@@ -150,6 +148,13 @@ export const SKP_CSS = `
 .skp-input:disabled{background:var(--skp-fill);color:var(--skp-text-3);}
 .skp-textarea{min-height:72px;resize:vertical;font-family:var(--ds-font-family-code,ui-monospace,monospace);font-size:13px;line-height:1.5;}
 .skp-subheader-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.skp-pick-all{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--skp-text-2);cursor:pointer;user-select:none;}
+.skp-pick-list{list-style:none;margin:8px 0 0;padding:0;max-height:240px;overflow-y:auto;border:1px solid var(--skp-border);border-radius:8px;background:var(--skp-surface);}
+.skp-pick-list>li+li{border-top:1px solid var(--skp-border);}
+.skp-pick-row{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;}
+.skp-pick-row:hover{background:var(--skp-hover);}
+.skp-pick-name{flex:none;max-width:38%;font-size:13.5px;font-weight:500;color:var(--skp-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.skp-pick-desc{flex:1;min-width:0;font-size:12px;color:var(--skp-text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .skp-note{font-size:13px;color:var(--skp-text-3);word-break:break-all;}
 .skp-modal-overlay{position:fixed;z-index:95;inset:0;background:var(--skp-mask);display:grid;place-items:center;}
 .skp-modal{width:520px;max-width:92vw;max-height:84vh;overflow:auto;display:flex;flex-direction:column;gap:16px;padding:22px;border:1px solid var(--skp-border);border-radius:14px;background:var(--skp-surface);box-shadow:0 24px 64px rgba(15,20,30,.22),0 4px 16px rgba(15,20,30,.1);scrollbar-width:thin;}
